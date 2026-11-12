@@ -124,6 +124,15 @@ def _cmd_event(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_site(a: argparse.Namespace) -> int:
+    from shelfproof.render.site import add_showroom
+
+    dest = add_showroom(Path(a.showroom_dir), Path(a.out), a.slug)
+    print(dest)
+    print(f"Publicar: npx --yes vercel@latest deploy {a.out} --prod --yes --project {a.project} --create-if-missing")
+    return 0
+
+
 def _cmd_vision_eval(a: argparse.Namespace) -> int:
     from shelfproof.vision.evaluate import evaluate_reference
 
@@ -184,6 +193,13 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--out", default="runs")
     c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
     c.set_defaults(fn=_cmd_event)
+
+    c = sub.add_parser("site", help="copia um Showroom para o site estatico (site/<slug>) e refaz o indice")
+    c.add_argument("showroom_dir")
+    c.add_argument("--slug", required=True, help="parte da URL, ex.: 2026-11-12 ou black-friday-2026")
+    c.add_argument("--out", default="site")
+    c.add_argument("--project", default="shelfproof-showroom", help="nome do projeto na Vercel")
+    c.set_defaults(fn=_cmd_site)
 
     c = sub.add_parser("vision-eval", help="mede a leitura visual nas pecas pagas do 11.11 (gasta API)")
     c.add_argument("--limit", type=int, default=0, help="0 = todas")

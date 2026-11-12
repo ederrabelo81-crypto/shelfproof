@@ -23,7 +23,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from shelfproof.detect.brands import find_brand, find_brand_first
+from shelfproof.detect.brands import INGREDIENTS, find_brand, find_brand_first
 from shelfproof.models import UNKNOWN_ADVERTISER, Piece
 
 SPONSOR_LABEL_RE = re.compile(r"^\s*(patrocinad[oa]s?|publicidade|an[uú]ncio|sponsored)\s*$", re.I)
@@ -307,11 +307,19 @@ def _ml_brand_cards(html: str) -> List[Piece]:
         brand = find_brand(loja.group(1).replace("-", " ")) if loja else None
         where = f"destino /loja/{loja.group(1)}" if brand and loja else ""
         if not brand:
+            brand = find_brand_first(re.sub(r"[-_/]", " ", urlparse(link).path))
+            where = f"destino {urlparse(link).path[:60]}" if brand else ""
+        if not brand:
             brand = find_brand_first(" ".join(titles))
             where = f"texto do card '{' '.join(titles)[:60]}'" if brand else ""
+        ingredient_only = not brand and bool(INGREDIENTS.search(" ".join(titles)))
         key = urlparse(link).path or link
-        if not brand or key in seen:
+        if (not brand and not ingredient_only) or key in seen:
             continue
+        if ingredient_only:
+            # so marca de componente no texto (Sony LYTIA, Intel Core): e anuncio de marca, mas de QUEM
+            # so a peca diz -> fica para a leitura visual
+            brand, where = UNKNOWN_ADVERTISER, "texto do card (so marca de componente: precisa da leitura visual)"
         seen.add(key)
         out.append(Piece("mercadolivre", "paid", "display", brand, "card de display da home", None,
                          title=" ".join(titles)[:140], href=link, img_src=pic,

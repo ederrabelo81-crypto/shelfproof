@@ -34,6 +34,30 @@ LOGO_DIR_DEFAULT = Path(__file__).resolve().parents[2] / "assets" / "logos"
 DARK_LOGOS_DEFAULT = {"samsung", "intel", "acer", "apple", "neutrogena"}
 
 
+def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[str], excluded: int = 0) -> List[str]:
+    """Como a leitura foi feita, dito com as condicoes REAIS de cada coleta (manifest.session)."""
+    clean = [s for s, v in sessions.items() if v == "anon"]
+    warm = [s for s, v in sessions.items() if v == "anon_warm"]
+    logged = [s for s, v in sessions.items() if v == "profile"]
+    notes = [f"Fonte: capturas automáticas de {date_label}, com as imagens que o navegador baixou."]
+    if clean:
+        notes.append(f"Sessão anônima limpa (sem login, sem histórico): {', '.join(clean)}.")
+    if warm:
+        notes.append(f"Sessão anônima aquecida (perfil dedicado, nunca logado, aquecido na home por causa do "
+                     f"antibot): {', '.join(warm)}. Vitrines \"com base nas suas visualizações\" refletem esse perfil.")
+    if logged:
+        notes.append(f"Sessão logada (persona, vitrine personalizada): {', '.join(logged)}.")
+    notes.append("Mídia paga só com marcador concreto na página (rótulo, código de slot ou parâmetro de anúncio); "
+                 "anunciante sem nome na página fica \"Não identificado\" ou é lido na própria peça.")
+    notes.append("Espaços pagos sem imagem salva entram no ranking e aparecem na prova como registro de código.")
+    if empty_sites:
+        notes.append(f"Sem peça com imagem nesta coleta: {', '.join(empty_sites)}.")
+    if excluded:
+        notes.append(f"{excluded} peça(s) com pessoa real ficaram sem imagem nesta versão (o espaço pago continua no ranking).")
+    notes.append("É a leitura de uma coleta, num instante: a vitrine gira ao longo do dia.")
+    return notes
+
+
 def render(context: Dict[str, Any], data: Dict[str, Any], out_dir: Path) -> Path:
     """Escreve out_dir/index.html. As imagens/logos ja devem estar em out_dir/img e out_dir/logo."""
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=select_autoescape(["html", "j2"]))
@@ -57,6 +81,7 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
     (out_dir / "img").mkdir(parents=True, exist_ok=True)
     (out_dir / "logo").mkdir(parents=True, exist_ok=True)
 
+    sessions: Dict[str, str] = {}
     mkts: Dict[str, Dict[str, str]] = {}
     pieces: List[Dict[str, Any]] = []
     extras: List[Dict[str, Any]] = []
@@ -68,6 +93,7 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
         raw = json.loads((rd / "pieces.json").read_text(encoding="utf-8"))
         style = MKT_STYLE.get(manifest.get("marketplace", "generic"), MKT_STYLE["generic"])
         key = style["key"]
+        sessions[style["name"]] = manifest.get("session", "anon")
         if key not in mkts:
             mkts[key] = {"name": style["name"], "color": style["color"]}
             sites.append(style["name"])
@@ -117,7 +143,8 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
         header_line=f"COLETA {date_label} · {' + '.join(sorted(d.upper() for d in devices))} · {len(mkts)} PAGINAS",
         event_label=event_label,
         sites_text=", ".join(sites[:-1]) + (" e " + sites[-1] if len(sites) > 1 else (sites[0] if sites else "")),
-        method_notes=[f"Fonte: capturas automaticas de {date_label} em sessao anonima limpa, com as imagens que o navegador baixou."],
+        method_notes=method_notes(date_label, sessions, [m["name"] for k, m in mkts.items()
+                                                       if not any(p["m"] == k for p in pieces)], len(excluded)),
     )
     (out_dir / "data.json").write_text(json.dumps(dict(context=context, data=data), ensure_ascii=False, indent=1),
                                        encoding="utf-8")

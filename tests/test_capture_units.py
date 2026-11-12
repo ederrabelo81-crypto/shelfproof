@@ -234,3 +234,23 @@ def test_imagem_casa_sem_o_sufixo_de_tamanho():
     b = a + "@resize_w797_nl.webp"
     assert _src_key(a) == _src_key(b)
     assert _src_key("https://http2.mlstatic.com/D_NQ_2X_7-MLA1-OO.webp") == _src_key("https://http2.mlstatic.com/D_NQ_7-MLA1-OO.webp")
+
+
+def test_marca_de_componente_nao_e_anunciante():
+    from shelfproof.detect.brands import find_brand_first
+    from shelfproof.detect.rules import _ml_brand_cards
+
+    # ML 12/11/2026: "SONY LYTIA 600" era o sensor do Moto g47 (Motorola), nao anuncio da Sony
+    assert find_brand_first("SONY LYTIA 600 FOTOS MAIS NITIDAS CAMERA DE 50 MP") is None
+    assert find_brand_first("Notebook Lenovo IdeaPad Intel Core i5") == "Lenovo"
+    assert find_brand_first("Console PlayStation 5 Sony") == "Sony"
+
+    def page(link):
+        return ('{"content":{"texts":{"primary_title":"SONY LYTIA 600","secondary_title":"FOTOS MAIS NITIDAS"},'
+                '"images":{"picture":"https://http2.mlstatic.com/x.webp"}},"actions":{"content_link":'
+                '{"action_id":"advertising","link":"%s"}}}' % link)
+    (p,) = _ml_brand_cards(page("https://www.mercadolivre.com.br/ofertas/moto-g47"))
+    assert p.advertiser == "Motorola" and p.is_paid
+    (p,) = _ml_brand_cards(page("https://www.mercadolivre.com.br/ofertas/sf-friday"))
+    assert p.advertiser == "Nao identificado" and p.is_paid
+    assert any("leitura visual" in e for e in p.evidence)

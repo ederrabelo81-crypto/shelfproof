@@ -5,7 +5,11 @@
   "event_label": "11.11",
   "sites_text": "Amazon, Mercado Livre, Magalu, Casas Bahia, Shopee e da loja Midea",
   "method_notes": [
-   "Fonte: as 6 home pages salvas em desktop no dia 11/11/2026, com as imagens que o navegador baixou. Amazon e Mercado Livre estavam logados, então parte das vitrines é personalizada."
+   "Fonte: as 6 home pages salvas em desktop no dia 11/11/2026, com as imagens que o navegador baixou. Amazon e Mercado Livre estavam logados, então parte das vitrines é personalizada.",
+   "Mídia paga: rótulo \"Patrocinado\"/\"Publicidade\"/\"Anúncio\" na peça, nome de slot de Ads (Magalu), placement de Amazon Ads, código \"ADS\" (Mercado Livre), \"Ads_CB\" (Casas Bahia) ou rastreio de anúncio (Shopee).",
+   "Espaços pagos sem imagem salva (Sponsored Products da Amazon, vitrine \"Patrocinados\" do Magalu, banner WAP da Casas Bahia, carrossel Electrolux do Magalu) entram no ranking e aparecem na prova como registro de código.",
+   "Peças com celebridades e pessoas reais ficaram de fora desta versão.",
+   "Esta é uma leitura de uma coleta. A versão em produção repete a coleta ao longo do dia, em desktop e mobile, e mede área e posição na dobra."
   ]
  },
  "data": {
