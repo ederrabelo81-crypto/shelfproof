@@ -59,9 +59,12 @@ CONTEXT_COMMON = dict(locale="pt-BR", timezone_id="America/Sao_Paulo")
 
 BLOCK_PHRASES = re.compile(
     r"captcha|n[aã]o sou um rob[oô]|verifique que voc[eê] [eé] humano|access denied|"
-    r"acesso negado|unusual traffic|pardon our interruption|/gz/account-verification",
+    r"acesso negado|unusual traffic|pardon our interruption|/gz/account-verification|"
+    # pagina de bloqueio do Akamai na Magalu (12/11/2026): "Nao e possivel acessar a pagina (Erro 403)"
+    r"n[aã]o [eé] poss[ií]vel acessar a p[aá]gina|erro 403|403 forbidden",
     re.I,
 )
+BLOCK_STATUS = {403, 429}
 
 # Coleta todas as <img> visiveis com a caixa na pagina inteira e os sinais que o
 # detector usa (link, rotulo de patrocinio por perto, slot-id da Amazon).
@@ -147,34 +150,94 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40]
 
 
+IMAGE_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
+             "image/gif": ".gif", "image/avif": ".avif"}
+
+
 class _ImageSink:
-    """Guarda os bytes das imagens que a pagina baixa (o criativo exato que foi ao ar)."""
+    """Guarda os bytes das imagens que a pagina baixa (o criativo exato que foi ao ar).
+
+    O handler de ``response`` so ANOTA a resposta. Ler o corpo (``response.body()``)
+    dentro do handler e uma ida e volta ao navegador no meio do despacho de eventos:
+    no Windows (Playwright 1.60) isso falhava sempre, em silencio, e a captura saia
+    com 0 imagens (12/11/2026). Os corpos sao lidos depois, em ``flush()``, e o que
+    faltar e buscado de novo pelo endereco em ``fetch_missing()``.
+    """
 
     def __init__(self, folder: Path, min_bytes: int) -> None:
         self.folder = folder
         self.min_bytes = min_bytes
         self.index: Dict[str, str] = {}
+        self.pending: List[Any] = []
+        self.failures: List[str] = []
         folder.mkdir(parents=True, exist_ok=True)
 
     def on_response(self, response: Any) -> None:
         try:
             ctype = (response.headers or {}).get("content-type", "")
-            if not ctype.startswith("image/") or "svg" in ctype:
-                return
-            url = response.url
-            if url in self.index:
-                return
-            body = response.body()
-            if len(body) < self.min_bytes:
-                return
-            ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
-                   "image/gif": ".gif", "image/avif": ".avif"}.get(ctype.split(";")[0], ".img")
-            name = hashlib.sha1(url.encode()).hexdigest()[:16] + ext
-            (self.folder / name).write_bytes(body)
-            self.index[url] = name
-        except Exception:
-            # resposta de redirect/streaming sem corpo: ignorar e seguir
-            pass
+            if ctype.startswith("image/") and "svg" not in ctype:
+                self.pending.append(response)
+        except Exception as exc:
+            self._fail("resposta", exc)
+
+    def _fail(self, what: str, exc: Exception) -> None:
+        if len(self.failures) < 5:  # amostra para o manifest; nunca silencioso
+            self.failures.append(f"{what}: {type(exc).__name__}: {str(exc)[:160]}")
+
+    def _save(self, url: str, ctype: str, body: bytes) -> None:
+        if url in self.index or len(body) < self.min_bytes:
+            return
+        name = hashlib.sha1(url.encode()).hexdigest()[:16] + IMAGE_EXT.get(ctype.split(";")[0].strip(), ".img")
+        (self.folder / name).write_bytes(body)
+        self.index[url] = name
+
+    def flush(self) -> None:
+        """Le os corpos das respostas anotadas (fora do handler de eventos)."""
+        pending, self.pending = self.pending, []
+        for resp in pending:
+            try:
+                if resp.url in self.index:
+                    continue
+                ctype = (resp.headers or {}).get("content-type", "")
+                self._save(resp.url, ctype, resp.body())
+            except Exception as exc:  # redirect/streaming sem corpo
+                self._fail(f"corpo {resp.url[:80]}", exc)
+
+    def fetch_missing(self, request: Any, urls: List[str]) -> int:
+        """Busca de novo as imagens da pagina que nao vieram pelo evento (ex.: cache do navegador)."""
+        got = 0
+        for url in dict.fromkeys(urls):
+            if not url.startswith("http") or url in self.index:
+                continue
+            try:
+                r = request.get(url, timeout=15_000)
+                ctype = (r.headers or {}).get("content-type", "")
+                if r.ok and ctype.startswith("image/") and "svg" not in ctype:
+                    before = len(self.index)
+                    self._save(url, ctype, r.body())
+                    got += len(self.index) - before
+            except Exception as exc:
+                self._fail(f"refetch {url[:80]}", exc)
+        return got
+
+
+def context_options(device: str, real_chrome_version: str = "") -> Dict[str, Any]:
+    """Opcoes do contexto para o dispositivo.
+
+    Com o Chrome real (CDP), o desktop NAO troca o User-Agent: um UA fixo "Chrome/131"
+    num Chrome 14x contradiz os client hints (Sec-CH-UA) que o proprio navegador envia,
+    e o Akamai da Magalu respondeu 403 na primeira requisicao (12/11/2026). No celular
+    o UA precisa ser de Android, mas com a versao do Chrome que esta de fato rodando.
+    """
+    opts = dict(DEVICES[device], **CONTEXT_COMMON)
+    major = (real_chrome_version or "").split(".")[0]
+    if not major.isdigit():
+        return opts
+    if device == "desktop":
+        opts.pop("user_agent", None)
+    else:
+        opts["user_agent"] = re.sub(r"Chrome/\d+", f"Chrome/{major}", opts["user_agent"])
+    return opts
 
 
 def _open_context(cfg: CaptureConfig):
@@ -189,6 +252,11 @@ def _open_context(cfg: CaptureConfig):
                 "Chrome local indisponivel. Ligue RAC_LOCAL_CHROME=1 e rode "
                 "scripts\\start_chrome_cdp.bat (ou use --engine launch em site sem antibot)."
             )
+        try:
+            version = lb._browser.version
+        except Exception:
+            version = ""
+        opts = context_options(cfg.device, version)
         if cfg.session == "anon":
             ctx = lb.new_isolated_context(**opts)
             if ctx is None:
@@ -240,10 +308,13 @@ def _human_scroll(page: Any, max_steps: int) -> int:
     return int(page.evaluate("document.documentElement.scrollHeight"))
 
 
-def _looks_blocked(page: Any, n_imgs: int) -> Optional[str]:
-    """Evidencia antes de string: so e bloqueio se NAO houver conteudo e houver frase de bloqueio."""
+def _looks_blocked(page: Any, n_imgs: int, http_status: Optional[int] = None) -> Optional[str]:
+    """Evidencia antes de string: so e bloqueio se NAO houver conteudo e houver sinal de bloqueio
+    (frase de bloqueio/captcha, ou HTTP 403/429 na pagina principal)."""
     if n_imgs >= 8:
         return None
+    if http_status in BLOCK_STATUS:
+        return f"HTTP {http_status} na pagina principal"
     try:
         text = page.inner_text("body")[:5000]
     except Exception:
@@ -271,7 +342,9 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
     try:
         page.on("response", sink.on_response)
         logger.info(f"[capture] {cfg.url} ({cfg.device}/{cfg.session})")
-        page.goto(cfg.url, wait_until="domcontentloaded", timeout=60_000)
+        resp = page.goto(cfg.url, wait_until="domcontentloaded", timeout=60_000)
+        http_status = resp.status if resp is not None else None
+        manifest["http_status"] = http_status
         try:
             page.wait_for_load_state("networkidle", timeout=15_000)
         except Exception:
@@ -321,7 +394,16 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             errors.append(f"full.jpg: {exc}")
 
         marketplace = identify_marketplace(html, page.url)
-        reason = _looks_blocked(page, len(elements))
+        # 4) criativos: corpos das respostas anotadas + o que faltou, buscado pelo endereco
+        try:
+            sink.flush()
+            visible_srcs = [e["src"] for e in elements if e.get("w", 0) >= 120 and e.get("h", 0) >= 60]
+            refetched = sink.fetch_missing(ctx.request, visible_srcs)
+            manifest["images_refetched"] = refetched
+        except Exception as exc:
+            errors.append(f"images: {exc}")
+
+        reason = _looks_blocked(page, len(elements), http_status)
         if reason:
             blocked = True
             errors.append(f"BLOQUEIO: '{reason}' e so {len(elements)} imagens na pagina")
@@ -329,6 +411,8 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         errors.append(f"captura: {exc}")
         logger.error(f"[capture] falhou: {exc}")
     finally:
+        if sink.failures:
+            errors.append(f"imagens com falha (amostra): {sink.failures}")
         try:
             (run_dir / "images.json").write_text(json.dumps(sink.index, ensure_ascii=False, indent=0), encoding="utf-8")
         except Exception as exc:
@@ -341,6 +425,8 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         except Exception:
             pass
 
+    if blocked:
+        logger.error(f"[capture] BLOQUEADO em {cfg.url} ({cfg.device}): veja {run_dir / 'full.jpg'}")
     ok = (run_dir / "page.html").exists() and not blocked
     logger.info(f"[capture] {'OK' if ok else 'FALHOU'} -> {run_dir} ({len(sink.index)} imagens, {len(errors)} erros)")
     return CaptureResult(run_dir=run_dir, marketplace=marketplace, ok=ok, blocked=blocked, errors=errors)
