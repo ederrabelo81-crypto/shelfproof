@@ -203,7 +203,11 @@ class _ImageSink:
             # redirect (3xx) nao tem corpo: o destino chega como outra resposta (pixel de rastreio da Magalu)
             if 300 <= int(getattr(response, "status", 200) or 200) < 400:
                 return
-            if _is_candidate(ctype) and response.request.resource_type in ("image", "other", "fetch"):
+            c = ctype.split(";")[0].strip().lower()
+            rtype = response.request.resource_type
+            # octet-stream so de requisicao de imagem (fetch de API com CSP gerava falha falsa na Casas Bahia)
+            if (c.startswith("image/") and "svg" not in c and rtype in ("image", "other", "fetch")) or \
+                    (c in GENERIC_TYPES and rtype == "image"):
                 self.pending.append(response)
         except Exception as exc:
             self._fail("resposta", exc)

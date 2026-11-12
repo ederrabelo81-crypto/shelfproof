@@ -168,6 +168,19 @@ def _magalu(soup: BeautifulSoup) -> List[Piece]:
 # ---------------------------------------------------------------------------
 # Casas Bahia
 # ---------------------------------------------------------------------------
+_CB_DEVICE = re.compile(r"^(desk|desktop|mob|mobile|app)$", re.I)
+
+
+def _cb_vtr_advertiser(parts: List[str]) -> str:
+    """Nome do anunciante no padrao Ads_CB_<data|versao>_<Anunciante>_<Desk|Mob>_...: o token antes do dispositivo."""
+    for i, tok in enumerate(parts):
+        if _CB_DEVICE.match(tok) and i >= 3:
+            cand = parts[i - 1]
+            if re.fullmatch(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9&+\-]{1,30}", cand) and not re.fullmatch(r"v\d+", cand, re.I):
+                return cand
+    return ""
+
+
 def _casasbahia(soup: BeautifulSoup) -> List[Piece]:
     out: List[Piece] = []
     for a in soup.find_all("a", href=re.compile(r"vtr_name=")):
@@ -178,9 +191,16 @@ def _casasbahia(soup: BeautifulSoup) -> List[Piece]:
         src = img_src(img) if img else ""
         if re.match(r"\s*Ads_CB", vtr, re.I):
             parts = [p for p in re.split(r"[_\s]+", vtr) if p]
-            brand = find_brand(" ".join(parts[2:]), alt) or UNKNOWN_ADVERTISER
+            evidence = [f"vtr_name '{vtr}' (prefixo Ads_CB = midia vendida)"]
+            brand = find_brand(" ".join(parts[2:]))
+            named = _cb_vtr_advertiser(parts)
+            if not brand and named:
+                # o vtr_name nomeia quem comprou (12/11/2026: Ads_CB_v2_Belmicro_Desk), mesmo fora do dicionario
+                brand = named
+                evidence.append(f"anunciante nomeado no vtr_name: '{named}'")
+            brand = brand or find_brand(alt) or UNKNOWN_ADVERTISER
             out.append(Piece("casasbahia", "paid", "banner", brand, vtr, 1, title=alt, alt=alt, href=href, img_src=src,
-                             evidence=[f"vtr_name '{vtr}' (prefixo Ads_CB = midia vendida)"]))
+                             evidence=evidence))
         else:
             out.append(Piece("casasbahia", "marketplace", "banner", "Casas Bahia", vtr, 1, title=alt, alt=alt,
                              href=href, img_src=src, evidence=[f"vtr_name '{vtr}' sem prefixo Ads_CB"],
