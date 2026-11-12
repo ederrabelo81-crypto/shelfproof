@@ -138,8 +138,8 @@ def test_eval_de_referencia_conta_certo_errado_e_abstencao():
             return [R(truth), R("Marca Errada"), R("", visible=False)][self.calls - 1]
 
     rep = evaluate_reference(Oracle([]), limit=3)
-    assert [r["outcome"] for r in rep["rows"]] == ["certo", "errado", "sem_gabarito"]
-    assert (rep["graded"], rep["right"], rep["wrong"]) == (2, 1, 1)
+    assert [r["outcome"] for r in rep["rows"]] == ["certo", "errado", "abstencao"]
+    assert (rep["graded"], rep["right"], rep["wrong"], rep["abstained"]) == (3, 1, 1, 1)
     assert rep["meets_phase3"] is False
 
 
