@@ -29,7 +29,7 @@ id,marketplace,slot,position,advertiser,type,creative
 28,Amazon,adplacements desktop-wp-dynamic-2,—,Não identificado,Display (Amazon Ads),Slot de display na home
 29,Amazon,Hero carrossel,1,Amazon,Campanha própria,Black dos Sonhos 11.11
 30,Mercado Livre,Display MS_1111_ADS_BITLAR_MA,1,Não identificado,Display (Mercado Ads),"Peça codificada 11.11 ""BITLAR"""
-31,Mercado Livre,Display MS_11a25_TECH_PREVENDAGTA_SEG,1,Não identificado,Display (Mercado Ads),Pré-venda Tech 11 a 25/11
+31,Mercado Livre,Display MS_11a25_TECH_PREVENDAGTA_SEG,1,Mercado Livre,Campanha do marketplace (sem _ADS_),Pré-venda Tech 11 a 25/11
 32,Mercado Livre,Hero carrossel,1,Mercado Livre,Campanha própria,Cupons até R$250 OFF / Black Friday até 70%
 33,Casas Bahia,Ads_CB_11.11_Midea_Desk,1,Midea,Banner de marca (Ads),Black Friday Midea – linha branca
 34,Casas Bahia,Ads_CB_11.11_WAP_Desk,1,WAP,Banner de marca (Ads),Black Friday WAP – 24x no carnê

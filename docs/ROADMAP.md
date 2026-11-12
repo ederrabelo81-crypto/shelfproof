@@ -40,8 +40,11 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 - Resultado do `vision-eval` em 12/11 (Opus 5.5): 17 certas, 0 erradas, 2 abstenções corretas
   (`amazon_05` é uma imagem em branco na referência; `magalu_17` só mostra "cartão Magalu" —
   na coleta real o HTML já dá Samsung e ela nem vai para a visão).
-- Marca lida fora do dicionário de `brands.py` (ex.: `ml_06` respondeu "Grand Theft Auto
-  (Rockstar Games)") entra com `needs_review` e aparece em `summary.json` → `paid_needs_review`:
+- `ml_06` (pré-venda GTA VI, `MS_11a25_TECH_PREVENDAGTA_SEG`) estava marcada como paga na
+  referência, mas o código não tem `_ADS_`: corrigida para campanha do Mercado Livre em 12/11,
+  coerente com o detector. O eval passa a ter 19 peças pagas, todas com gabarito.
+- Marca lida fora do dicionário de `brands.py` (ex.: a `ml_06` voltou "Grand Theft Auto
+  (Rockstar Games)", nome de franquia) entra com `needs_review` e aparece em `summary.json` → `paid_needs_review`:
   conferir e, se for o caso, incluir a marca no dicionário.
 - `people_present=sim` em `Piece.extra` ajuda a folha de contato; a decisão continua humana (regra 8).
 
