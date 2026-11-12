@@ -65,6 +65,9 @@ BLOCK_PHRASES = re.compile(
     re.I,
 )
 BLOCK_STATUS = {403, 429}
+# Sites com Akamai Bot Manager: no aquecimento, esperar o cookie _abck validar (~0~)
+AKAMAI_HOSTS = ("magazineluiza.com.br", "casasbahia.com.br")
+SESSIONS = ("anon", "anon_warm", "profile")
 
 # Coleta todas as <img> visiveis com a caixa na pagina inteira e os sinais que o
 # detector usa (link, rotulo de patrocinio por perto, slot-id da Amazon).
@@ -123,7 +126,8 @@ ELEMENTS_JS = r"""
 class CaptureConfig:
     url: str
     device: str = "desktop"            # desktop | mobile
-    session: str = "anon"              # anon (contexto limpo) | profile (perfil logado = persona)
+    session: str = "anon"              # anon (contexto limpo) | anon_warm (perfil dedicado nunca logado,
+                                       # aquecido) | profile (perfil logado = persona)
     engine: str = "cdp"                # cdp (Chrome comum) | launch (so sites sem antibot / testes)
     out_root: Path = Path("runs")
     carousel_seconds: float = 24.0     # quanto tempo observar a 1a tela girando
@@ -267,6 +271,10 @@ def context_options(device: str, real_chrome_version: str = "") -> Dict[str, Any
 
 def _open_context(cfg: CaptureConfig):
     """Devolve (context, page, cleanup). Levanta RuntimeError se nao houver navegador."""
+    if cfg.session not in SESSIONS:
+        raise RuntimeError(f"sessao desconhecida: {cfg.session}")
+    if cfg.session == "anon_warm" and (cfg.engine != "cdp" or cfg.device != "desktop"):
+        raise RuntimeError("sessao anon_warm so existe no Chrome local (cdp) e em desktop")
     opts = dict(DEVICES[cfg.device], **CONTEXT_COMMON)
     if cfg.engine == "cdp":
         from shelfproof.browser.local_browser import get_local_browser
@@ -282,6 +290,15 @@ def _open_context(cfg: CaptureConfig):
         except Exception:
             version = ""
         opts = context_options(cfg.device, version)
+        if cfg.session == "anon_warm":
+            # Sessao do perfil DEDICADO do Shelf Proof (nunca logado), aquecida na home como no
+            # RAC: o Akamai da Magalu nega contexto novo e vazio (403 em 12/11/2026). So desktop:
+            # o contexto ja existente nao troca UA/touch, entao nao ha celular de verdade aqui.
+            page = lb.new_page()
+            if page is None:
+                raise RuntimeError("Aba nao abriu no Chrome local")
+            page.set_viewport_size(DEVICES["desktop"]["viewport"])
+            return lb.context, page, page.close
         if cfg.session == "anon":
             ctx = lb.new_isolated_context(**opts)
             if ctx is None:
@@ -333,6 +350,27 @@ def _human_scroll(page: Any, max_steps: int) -> int:
     return int(page.evaluate("document.documentElement.scrollHeight"))
 
 
+def _warm_up(page: Any, url: str) -> Dict[str, Any]:
+    """Aquece a sessao na home do site (como o RAC): visita, mexe o mouse, rola e, em site
+    com Akamai, espera o _abck validar. Devolve o que aconteceu, para o manifest."""
+    from shelfproof.browser.local_browser import get_local_browser
+
+    u = urlparse(url)
+    home = f"{u.scheme}://{u.netloc}/"
+    akamai = any(h in u.netloc for h in AKAMAI_HOSTS)
+    lb = get_local_browser()
+    ok = bool(lb) and lb.warmup(page, home, wait_abck=akamai, host_key=u.netloc)
+    info: Dict[str, Any] = {"home": home, "akamai": akamai, "ok": bool(ok)}
+    if akamai:
+        try:
+            ck = next((c["value"] for c in page.context.cookies(home) if c["name"] == "_abck"), "")
+            info["abck"] = "validated" if "~0~" in ck else ("challenge" if ck else "absent")
+        except Exception as exc:
+            info["abck"] = f"erro: {exc}"
+    time.sleep(random.uniform(2.0, 4.0))  # ritmo humano antes da captura
+    return info
+
+
 def _looks_blocked(page: Any, n_imgs: int, http_status: Optional[int] = None) -> Optional[str]:
     """Evidencia antes de string: so e bloqueio se NAO houver conteudo e houver sinal de bloqueio
     (frase de bloqueio/captcha, ou HTTP 403/429 na pagina principal)."""
@@ -363,8 +401,22 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
     marketplace = "generic"
     blocked = False
 
-    ctx, page, cleanup = _open_context(cfg)
     try:
+        ctx, page, cleanup = _open_context(cfg)
+    except Exception as exc:  # sem navegador/sessao: a pasta ainda sai com o manifest e o motivo
+        errors.append(f"contexto: {exc}")
+        logger.error(f"[capture] {cfg.url} ({cfg.device}/{cfg.session}): {exc}")
+        manifest.update(marketplace=marketplace, blocked=False, errors=errors, images_saved=0,
+                        finished_at=now_brt().isoformat())
+        (run_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        return CaptureResult(run_dir=run_dir, marketplace=marketplace, ok=False, errors=errors)
+    try:
+        if cfg.session == "anon_warm":
+            try:
+                manifest["warmup"] = _warm_up(page, cfg.url)
+                logger.info(f"[capture] aquecimento: {manifest['warmup']}")
+            except Exception as exc:
+                errors.append(f"aquecimento: {exc}")
         page.on("response", sink.on_response)
         logger.info(f"[capture] {cfg.url} ({cfg.device}/{cfg.session})")
         resp = page.goto(cfg.url, wait_until="domcontentloaded", timeout=60_000)

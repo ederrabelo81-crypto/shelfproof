@@ -35,6 +35,9 @@ def _cmd_capture(a: argparse.Namespace) -> int:
     from shelfproof.pipeline import analyze
 
     devices = ["desktop", "mobile"] if a.device == "both" else [a.device]
+    if a.session == "anon_warm" and "mobile" in devices:
+        logger.warning("anon_warm so existe em desktop: o celular nao sera capturado nesta sessao")
+        devices = [d for d in devices if d == "desktop"]
     reader = _reader(a)
     rc = 0
     for dev in devices:
@@ -99,8 +102,12 @@ def _cmd_event(a: argparse.Namespace) -> int:
     runs: List[Path] = []
     for t in targets:
         for dev in t.get("devices", ["desktop", "mobile"]):
+            # anon_warm (targets.json) so existe em desktop; o celular segue no contexto limpo
+            session = t.get("session", "anon")
+            if session == "anon_warm" and dev != "desktop":
+                session = "anon"
             try:
-                res = capture(CaptureConfig(url=t["url"], device=dev, session="anon", out_root=Path(a.out)))
+                res = capture(CaptureConfig(url=t["url"], device=dev, session=session, out_root=Path(a.out)))
             except Exception as exc:  # um site nao derruba o evento
                 logger.error(f"{t['url']} ({dev}): {exc}")
                 continue
@@ -137,7 +144,8 @@ def main(argv: List[str] | None = None) -> int:
     c = sub.add_parser("capture", help="captura uma URL (print, HTML, imagens) e analisa")
     c.add_argument("url")
     c.add_argument("--device", choices=["desktop", "mobile", "both"], default="desktop")
-    c.add_argument("--session", choices=["anon", "profile"], default="anon")
+    c.add_argument("--session", choices=["anon", "anon_warm", "profile"], default="anon",
+                   help="anon_warm: perfil dedicado nunca logado, aquecido na home (Magalu/Casas Bahia; so desktop)")
     c.add_argument("--engine", choices=["cdp", "launch"], default="cdp")
     c.add_argument("--carousel", type=float, default=24.0, help="segundos observando a 1a tela")
     c.add_argument("--headless", action="store_true", help="so com --engine launch (testes/CI)")

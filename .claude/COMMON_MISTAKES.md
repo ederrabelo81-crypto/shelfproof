@@ -105,3 +105,10 @@ versão do Chrome que está rodando (`capture.context_options`). É o R14 do RAC
 tinha nenhuma frase conhecida, e a captura saiu "OK, 0 peças". **Certo:** o status HTTP da
 página principal entra como evidência (`manifest.http_status`; 403/429 com pouca imagem =
 bloqueio) e a frase da Magalu está em `BLOCK_PHRASES`.
+
+### S11. Contexto novo e vazio em site com Akamai (12/11/2026)
+**Errado:** abrir a home da Magalu num `new_context()` (sem cookie, sem histórico) do
+Chrome real: 403 já na primeira requisição, mesmo com rebrowser e UA real. Na mesma
+janela, a home digitada à mão abria normal. **Certo:** `--session anon_warm` (ou
+`"session": "anon_warm"` no `targets.json`): aba no perfil dedicado nunca logado,
+aquecida na home até o `_abck` validar, como o RAC faz (`cdp_magalu_collection.md`).
