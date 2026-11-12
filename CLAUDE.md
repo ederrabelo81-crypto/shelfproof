@@ -55,6 +55,11 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 3. **Sessão anônima limpa por padrão.** Home logada é personalizada (no 11.11, o
    histórico do usuário fez ar-condicionado dominar Amazon e ML). Persona logada
    (`--session profile`) é uma coleta **separada** e sempre rotulada.
+   Exceção autorizada em 12/11/2026: **`anon_warm`** para sites com Akamai (Magalu,
+   Casas Bahia), que negam contexto novo e vazio (403). Usa a sessão do perfil
+   dedicado `chrome_profile_shelfproof`, que **nunca** faz login e só visita homes,
+   aquecida na home (espera o `_abck` validar). Só desktop. Rotulada no manifest
+   (`session`, `warmup`). Nunca logar nesse perfil nem navegar produtos nele.
 4. **Chrome COMUM + CDP**, porta **9223** e perfil `data/chrome_profile_shelfproof`
    (o RAC usa 9222 e `data/chrome_profile`; os dois rodam no mesmo PC). Nunca
    `launch_persistent_context` em site com antibot. `--engine launch` é só para
@@ -85,10 +90,13 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 38 testes; o e2e pula sem Chrome
+pytest -q                                   # 40 testes; o e2e pula sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
+
+# Magalu/Casas Bahia (Akamai): sessao anonima aquecida, so desktop
+python -m shelfproof capture https://www.magazineluiza.com.br/ --session anon_warm --vision
 
 # Página salva com Ctrl+S (como as do 11.11)
 python -m shelfproof detect-file pagina.html --paid-only

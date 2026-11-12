@@ -27,6 +27,9 @@ pytest -q
 # uma URL, desktop + mobile, sessão anônima
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
 
+# Magalu/Casas Bahia (Akamai): sessao anonima aquecida, so desktop
+python -m shelfproof capture https://www.magazineluiza.com.br/ --session anon_warm --vision
+
 # uma página salva com Ctrl+S
 python -m shelfproof detect-file "Black Friday Magalu.html" --paid-only
 
