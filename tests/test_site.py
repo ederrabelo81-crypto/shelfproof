@@ -22,7 +22,8 @@ def test_publica_showroom_e_monta_indice(tmp_path: Path):
     assert not (dest / "contact_sheet.jpg").exists()  # folha de revisao nao vai para o ar
     idx = (site / "index.html").read_text(encoding="utf-8")
     assert 'href="2026-11-11/"' in idx and "11.11" in idx and "espaços pagos" in idx
-    assert json.loads((site / "vercel.json").read_text())["cleanUrls"] is True
+    vj = json.loads((site / "vercel.json").read_text())
+    assert vj["cleanUrls"] is True and vj["trailingSlash"] is True  # caminhos relativos do Showroom
     # republicar o mesmo slug substitui, nao duplica
     add_showroom(sr, site, "2026-11-11")
     assert (site / "index.html").read_text(encoding="utf-8").count('class="ev"') == 1

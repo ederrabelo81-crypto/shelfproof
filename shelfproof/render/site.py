@@ -32,7 +32,10 @@ def add_showroom(showroom_dir: Path, site_dir: Path, slug: str) -> Path:
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(showroom_dir, dest, ignore=lambda d, names: [n for n in names if n in SKIP])
-    (site_dir / "vercel.json").write_text(json.dumps({"cleanUrls": True}, indent=1), encoding="utf-8")
+    # trailingSlash: /2026-11-12 vira /2026-11-12/. Sem a barra, img/x.webp resolveria para /img/x.webp
+    # (fora da pasta do evento) e a pagina abriria sem pecas.
+    (site_dir / "vercel.json").write_text(json.dumps({"cleanUrls": True, "trailingSlash": True}, indent=1),
+                                          encoding="utf-8")
     write_index(site_dir)
     return dest
 

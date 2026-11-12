@@ -11,5 +11,7 @@ if "%~2"=="" (
   exit /b 1
 )
 python -m shelfproof site "%~1" --slug %2 || exit /b 1
+REM login na Vercel so na primeira vez (fica salvo no PC)
+call npx --yes vercel@latest whoami >nul 2>&1 || call npx --yes vercel@latest login
 call npx --yes vercel@latest deploy site --prod --yes --project shelfproof-showroom --create-if-missing
 endlocal
