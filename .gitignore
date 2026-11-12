@@ -8,3 +8,5 @@ data/
 runs/
 logs/
 review.json
+site/
+.vercel/

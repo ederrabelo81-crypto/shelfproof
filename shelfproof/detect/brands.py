@@ -81,14 +81,27 @@ def find_brand(*texts: Optional[str]) -> Optional[str]:
     return None
 
 
+# Marca de COMPONENTE dentro do titulo de outro produto: nunca e o anunciante.
+# 12/11/2026: card do ML "SONY LYTIA 600 ... camera de 50 MP" era um Moto g47 (Motorola).
+INGREDIENTS = re.compile(
+    r"\bsony\s+(lytia|imx)\b|\bintel\s+(core|inside|celeron|pentium|evo)\b|\bsnapdragon\b|\bqualcomm\b"
+    r"|\bmediatek\b|\bwindows\s*1[01]\b|\bdolby\b|\bleica\b|\bzeiss\b|\bgorilla\s+glass\b",
+    re.I,
+)
+
+
+def strip_ingredients(text: str) -> str:
+    return INGREDIENTS.sub(" ", text or "")
+
+
 def find_brand_first(*texts: Optional[str]) -> Optional[str]:
     """Marca que aparece PRIMEIRO no texto (titulo de produto).
 
     "Notebook Lenovo LOQ ... Intel Core i5" e da Lenovo: o processador vem depois.
     Empate na mesma posicao segue a prioridade do dicionario ("Springer Midea" antes de "Midea").
     """
-    blob = " ".join(t for t in texts if t)
-    if not blob:
+    blob = strip_ingredients(" ".join(t for t in texts if t))
+    if not blob.strip():
         return None
     best: Optional[Tuple[int, int, str]] = None
     for rank, (name, pats) in enumerate(_COMPILED):

@@ -19,6 +19,7 @@ shelf-proof/
 │   └── render/
 │       ├── showroom.py           # dados -> index.html + img/ + logo/
 │       ├── contact_sheet.py      # folha de contato para revisão humana
+│       ├── site.py               # site estático (Vercel): site/<slug>/ + índice dos eventos
 │       └── templates/showroom.html.j2   # o Showroom aprovado, com DATA em JSON
 ├── assets/logos/                 # logos recortados das peças (slug.png)
 ├── reference/showroom_2026-11-11/      # ALVO VISUAL aprovado + data.json + placements_v1.csv
