@@ -49,7 +49,9 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
    (rótulo, código de slot, parâmetro de link) gravado em `Piece.evidence`.
    O teste `test_toda_peca_paga_tem_evidencia` reprova o contrário.
 2. **Anunciante desconhecido fica `Nao identificado`.** Nunca chutar marca pela
-   categoria ou pela cor do banner. Quem resolve é a leitura visual (fase 3).
+   categoria ou pela cor do banner. Quem resolve é a leitura visual (fase 3,
+   `shelfproof/vision/`), e só com marca escrita/logo visível e confiança alta ou
+   média, gravada em `evidence` como "lido na imagem". A visão nunca cria peça paga.
 3. **Sessão anônima limpa por padrão.** Home logada é personalizada (no 11.11, o
    histórico do usuário fez ar-condicionado dominar Amazon e ML). Persona logada
    (`--session profile`) é uma coleta **separada** e sempre rotulada.
@@ -83,13 +85,17 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 19 testes; o e2e pula sem Chrome
+pytest -q                                   # 32 testes; o e2e pula sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
 
 # Página salva com Ctrl+S (como as do 11.11)
 python -m shelfproof detect-file pagina.html --paid-only
+
+# Fase 3: anunciante lido na imagem (precisa de ANTHROPIC_API_KEY no .env)
+python -m shelfproof analyze --vision runs/<data>/<captura>
+python -m shelfproof vision-eval            # acerto no 11.11: >= 80% e 0 erradas
 
 # Evento inteiro: todas as homes de config/targets.json -> Showroom
 python -m shelfproof event --event "Black Friday" --date 27/11/2026

@@ -33,6 +33,10 @@ python -m shelfproof detect-file "Black Friday Magalu.html" --paid-only
 # evento: todas as homes de config/targets.json -> Showroom
 python -m shelfproof event --event "Black Friday" --date 27/11/2026
 
+# anunciante lido na imagem quando o HTML não diz (Claude API, ANTHROPIC_API_KEY no .env)
+python -m shelfproof analyze --vision runs/<data>/<captura>
+python -m shelfproof vision-eval
+
 # revisão e montagem final
 python -m shelfproof contact-sheet runs/showroom/black-friday
 python -m shelfproof showroom <runs desktop...> --event "Black Friday" --date 27/11/2026 --out runs/showroom/black-friday --review review.json

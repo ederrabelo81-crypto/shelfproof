@@ -6,6 +6,8 @@
     python -m shelfproof event --targets config/targets.json --event "Black Friday" --date 27/11/2026
     python -m shelfproof showroom --event "Black Friday" --date 27/11/2026 --out out/bf <run_dir> ...
     python -m shelfproof contact-sheet out/bf
+    python -m shelfproof analyze --vision <run_dir>          # fase 3: anunciante lido na imagem
+    python -m shelfproof vision-eval                          # mede a leitura visual no 11.11
 """
 from __future__ import annotations
 
@@ -19,17 +21,27 @@ from typing import List
 from loguru import logger
 
 
+def _reader(a: argparse.Namespace):
+    """Leitor visual quando --vision foi pedido (None = desligado)."""
+    if not getattr(a, "vision", False):
+        return None
+    from shelfproof.vision.advertiser import default_reader
+
+    return default_reader()
+
+
 def _cmd_capture(a: argparse.Namespace) -> int:
     from shelfproof.collect.capture import CaptureConfig, capture
     from shelfproof.pipeline import analyze
 
     devices = ["desktop", "mobile"] if a.device == "both" else [a.device]
+    reader = _reader(a)
     rc = 0
     for dev in devices:
         res = capture(CaptureConfig(url=a.url, device=dev, session=a.session, engine=a.engine,
                                     out_root=Path(a.out), carousel_seconds=a.carousel, headless=a.headless))
         if res.ok:
-            ps = analyze(res.run_dir)
+            ps = analyze(res.run_dir, reader=reader)
             paid = Counter(p.advertiser for p in ps if p.is_paid)
             logger.info(f"[{dev}] {len(ps)} pecas, {sum(paid.values())} pagas: {dict(paid.most_common(8))}")
         else:
@@ -42,8 +54,9 @@ def _cmd_capture(a: argparse.Namespace) -> int:
 def _cmd_analyze(a: argparse.Namespace) -> int:
     from shelfproof.pipeline import analyze
 
+    reader = _reader(a)
     for rd in a.run_dirs:
-        ps = analyze(Path(rd))
+        analyze(Path(rd), reader=reader)
         print(json.dumps(json.loads((Path(rd) / "summary.json").read_text(encoding="utf-8")), ensure_ascii=False, indent=1))
     return 0
 
@@ -82,6 +95,7 @@ def _cmd_event(a: argparse.Namespace) -> int:
     from shelfproof.render.showroom import build_from_runs
 
     targets = json.loads(Path(a.targets).read_text(encoding="utf-8"))["targets"]
+    reader = _reader(a)
     runs: List[Path] = []
     for t in targets:
         for dev in t.get("devices", ["desktop", "mobile"]):
@@ -91,7 +105,7 @@ def _cmd_event(a: argparse.Namespace) -> int:
                 logger.error(f"{t['url']} ({dev}): {exc}")
                 continue
             if res.ok:
-                analyze(res.run_dir)
+                analyze(res.run_dir, reader=reader)
                 if dev == a.showroom_device:
                     runs.append(res.run_dir)
     if not runs:
@@ -101,6 +115,19 @@ def _cmd_event(a: argparse.Namespace) -> int:
     out = build_from_runs(runs, Path(a.out) / "showroom" / slug, a.event, a.date)
     print(out)
     return 0
+
+
+def _cmd_vision_eval(a: argparse.Namespace) -> int:
+    from shelfproof.vision.evaluate import evaluate_reference
+
+    from shelfproof.vision.advertiser import default_reader
+
+    reader = default_reader()
+    if reader is None:
+        return 2
+    rep = evaluate_reference(reader, limit=a.limit)
+    print(json.dumps(rep, ensure_ascii=False, indent=1))
+    return 0 if rep["wrong"] == 0 else 1
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -115,10 +142,12 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--carousel", type=float, default=24.0, help="segundos observando a 1a tela")
     c.add_argument("--headless", action="store_true", help="so com --engine launch (testes/CI)")
     c.add_argument("--out", default="runs")
+    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
     c.set_defaults(fn=_cmd_capture)
 
     c = sub.add_parser("analyze", help="(re)classifica capturas ja feitas")
     c.add_argument("run_dirs", nargs="+")
+    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
     c.set_defaults(fn=_cmd_analyze)
 
     c = sub.add_parser("detect-file", help="classifica um HTML salvo (Ctrl+S)")
@@ -145,8 +174,19 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--date", required=True)
     c.add_argument("--showroom-device", default="desktop")
     c.add_argument("--out", default="runs")
+    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
     c.set_defaults(fn=_cmd_event)
 
+    c = sub.add_parser("vision-eval", help="mede a leitura visual nas pecas pagas do 11.11 (gasta API)")
+    c.add_argument("--limit", type=int, default=0, help="0 = todas")
+    c.set_defaults(fn=_cmd_vision_eval)
+
+    try:  # .env do PC coletor (RAC_*, ANTHROPIC_API_KEY)
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass
     a = ap.parse_args(argv)
     return a.fn(a)
 

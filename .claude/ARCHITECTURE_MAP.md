@@ -13,6 +13,9 @@ shelf-proof/
 │   ├── detect/
 │   │   ├── rules.py              # uma função por marketplace + genérico (rótulo Patrocinado/Anúncio)
 │   │   └── brands.py             # dicionário de marcas e aliases de slug (ssg_ = Samsung, elux = Electrolux)
+│   ├── vision/
+│   │   ├── advertiser.py         # fase 3: anunciante lido na imagem (Claude API), cache vision.json
+│   │   └── evaluate.py           # vision-eval: acerto contra as peças pagas do 11.11
 │   └── render/
 │       ├── showroom.py           # dados -> index.html + img/ + logo/
 │       ├── contact_sheet.py      # folha de contato para revisão humana
@@ -41,6 +44,8 @@ config/targets.json ─► capture()  (Chrome comum via CDP, contexto anônimo, 
                                   + images.json     ─► arquivo do criativo
                                   + frames          ─► tempo no ar na 1ª tela
                          ▼
+                      [--vision]  pagas "Nao identificado" ─► leitura da imagem ─► vision.json
+                         ▼
                       pieces.json + summary.json (share of pixels, pagos por anunciante)
                          ▼
                       contact-sheet ─► revisão humana ─► review.json
@@ -55,6 +60,7 @@ config/targets.json ─► capture()  (Chrome comum via CDP, contexto anônimo, 
 | Novo site / nova regra de anúncio | `detect/rules.py` (+ teste com HTML salvo em `tests/fixtures`) |
 | Nova marca ou alias de slug | `detect/brands.py` |
 | Tempo de observação do carrossel, viewport, UA | `collect/capture.py` (`CaptureConfig`, `DEVICES`) |
+| Prompt/aceite da leitura visual | `vision/advertiser.py` (`SYSTEM`, `accept`) + `pytest tests/test_vision.py` + `vision-eval` |
 | Visual do Showroom | `render/templates/showroom.html.j2` |
 | Lista de homes de um evento | `config/targets.json` |
 | Porta/perfil do Chrome | `.env` (`RAC_CDP_PORT`, `RAC_CHROME_PROFILE_DIR`) |

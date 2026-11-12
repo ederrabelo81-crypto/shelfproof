@@ -4,6 +4,7 @@
         -> detect()                     (quem e pago, de quem, qual slot)
         -> casa com elements.json       (onde esta, que area ocupa, qual dobra)
         -> casa com images.json         (qual arquivo e o criativo)
+        -> [opcional] leitura visual    (anunciante das pagas "Nao identificado", fase 3)
         -> pieces.json + summary.json
 """
 from __future__ import annotations
@@ -13,8 +14,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from loguru import logger
+
 from shelfproof.detect.rules import detect
-from shelfproof.models import BBox, Piece
+from shelfproof.models import UNKNOWN_ADVERTISER, BBox, Piece
 
 
 def _norm(u: str) -> str:
@@ -28,7 +31,8 @@ def _load_json(p: Path, default: Any) -> Any:
         return default
 
 
-def analyze(run_dir: Path) -> List[Piece]:
+def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
+    """Classifica a captura. ``reader`` (vision.advertiser.VisionClient) liga a leitura visual."""
     run_dir = Path(run_dir)
     manifest = _load_json(run_dir / "manifest.json", {})
     html = (run_dir / "page.html").read_text(encoding="utf-8", errors="ignore")
@@ -68,6 +72,14 @@ def analyze(run_dir: Path) -> List[Piece]:
             if hits:
                 p.extra["airtime_first_screen"] = f"{hits}/{len(frames)}"
 
+    if reader is not None:
+        from shelfproof.vision.advertiser import resolve_unknown_advertisers
+
+        st = resolve_unknown_advertisers(pieces, run_dir, reader)
+        logger.info(f"visao: {st['resolved']}/{st['candidates']} anunciantes lidos na imagem "
+                    f"({st['api_calls']} chamadas, {st['cached']} do cache, {st['no_image']} sem imagem, "
+                    f"{st['errors']} erros)")
+
     (run_dir / "pieces.json").write_text(
         json.dumps([p.to_dict() for p in pieces], ensure_ascii=False, indent=1), encoding="utf-8")
     (run_dir / "summary.json").write_text(
@@ -95,5 +107,7 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         "share_of_pixels_by_ownership": {k: round(v / total_area, 4) for k, v in area_owner.items()},
         "paid_by_advertiser": dict(sorted(paid_by_adv.items(), key=lambda kv: -kv[1])),
         "paid_area_by_advertiser": {k: round(v) for k, v in sorted(area_by_adv.items(), key=lambda kv: -kv[1])},
+        "paid_unidentified": paid_by_adv.get(UNKNOWN_ADVERTISER, 0),
+        "paid_identified_by_vision": sum(1 for p in pieces if p.is_paid and p.extra.get("advertiser_source") == "vision"),
         "first_fold_paid": sum(1 for p in pieces if p.is_paid and p.bbox and p.bbox.fold == 1),
     }
