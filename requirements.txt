@@ -8,3 +8,5 @@ Jinja2>=3.1.0
 loguru>=0.7.2
 python-dotenv>=1.0.1
 pytest>=8.0.0
+# Fase 3 (leitura visual do anunciante): so e usado com --vision
+anthropic>=2.8.0
