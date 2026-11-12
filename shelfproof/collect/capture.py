@@ -378,6 +378,39 @@ def _warm_up(page: Any, url: str) -> Dict[str, Any]:
     return info
 
 
+# Botoes que um cliente clicaria para ver a vitrine. So nomes EXATOS: nunca login, nunca captcha.
+OVERLAY_BUTTONS = [
+    re.compile(r"^\s*portugu[eê]s\s*\(br\)\s*$", re.I),            # Shopee: "Selecione seu idioma"
+    re.compile(r"^\s*aceitar( todos)?( os)?( cookies)?\s*$", re.I),  # aviso de cookies
+    re.compile(r"^\s*(aceito|concordo|entendi|ok,? entendi)\s*$", re.I),
+]
+
+
+def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
+    """Fecha janelas que cobrem a vitrine (idioma, cookies). Devolve o que foi clicado, para o manifest."""
+    clicked: List[str] = []
+    for _ in range(passes):
+        hit = False
+        for pat in OVERLAY_BUTTONS:
+            try:
+                loc = page.get_by_role("button", name=pat)
+                for i in range(min(loc.count(), 3)):
+                    b = loc.nth(i)
+                    if b.is_visible():
+                        name = (b.inner_text(timeout=1000) or "").strip()
+                        b.click(timeout=2000)
+                        clicked.append(name)
+                        hit = True
+                        time.sleep(random.uniform(0.6, 1.2))
+                        break
+            except Exception:
+                continue  # botao sumiu entre a contagem e o clique: segue
+        if not hit:
+            break
+        time.sleep(1.0)  # a proxima janela pode aparecer depois da primeira
+    return clicked
+
+
 def _looks_blocked(page: Any, n_imgs: int, http_status: Optional[int] = None) -> Optional[str]:
     """Evidencia antes de string: so e bloqueio se NAO houver conteudo e houver sinal de bloqueio
     (frase de bloqueio/captcha, ou HTTP 403/429 na pagina principal)."""
@@ -434,6 +467,12 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         except Exception:
             pass  # home de marketplace raramente fica ociosa; seguir
         manifest["final_url"] = page.url
+
+        # 0) janelas por cima da vitrine (idioma da Shopee, aviso de cookies): fechar como um cliente
+        try:
+            manifest["dismissed"] = dismiss_overlays(page)
+        except Exception as exc:
+            errors.append(f"overlays: {exc}")
 
         # 1) carrossel: observar a 1a tela girando ANTES de rolar
         frames_dir = run_dir / "frames"

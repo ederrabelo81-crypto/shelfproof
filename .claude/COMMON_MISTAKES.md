@@ -124,3 +124,10 @@ que aparece primeiro no texto). O dicionário ordenado continua valendo para slu
 tem `href="/notebook-.../p/..."` no HTML e `https://www.magazineluiza.com.br/notebook-...`
 no navegador; 11 peças pagas ficaram com área 0. **Certo:** guardar a imagem do card e,
 sem ela, casar por host + caminho (`pipeline._path_key`), um elemento por peça.
+
+### S14. Janela por cima da vitrine (12/11/2026)
+**Errado:** fotografar a Shopee com o seletor "Selecione seu idioma" e o aviso de cookies
+cobrindo o carrossel: frames e print mostram a janela, não a vitrine. **Certo:**
+`capture.dismiss_overlays` clica, como um cliente, só em botões de nome exato
+(`Português (BR)`, `Aceitar todos os cookies`, `Entendi`...) e grava em `manifest.dismissed`.
+Nunca clicar em login, captcha ou "Configurações".
