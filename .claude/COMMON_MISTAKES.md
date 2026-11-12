@@ -84,3 +84,21 @@ contato e `review.json` antes de publicar; o espaço pago continua no ranking.
 Amazon `adplacements:*` e parte do Mercado Ads não dizem quem pagou; o
 "Sponsored Brands" da Neutrogena só tinha o logo na imagem. **Certo:** `Nao
 identificado` + evidência "precisa da leitura visual" até a fase 3 (visão).
+
+### S8. Ler o corpo da imagem dentro do handler de `response` (12/11/2026)
+**Errado:** `response.body()` dentro de `page.on("response", ...)`, com `except: pass`.
+No Windows (Playwright 1.60) falhava sempre e a captura saía com **0 imagens**, sem erro.
+**Certo:** o handler só anota a resposta; `_ImageSink.flush()` lê os corpos depois e
+`fetch_missing()` busca de novo, pelo endereço, o que faltou. Falha vai para `manifest.errors`.
+
+### S9. User-Agent fixo de outra versão do Chrome (12/11/2026)
+**Errado:** UA "Chrome/131" no contexto de um Chrome 14x via CDP. O `navigator.userAgent`
+contradiz os client hints (`Sec-CH-UA`) que o próprio navegador manda; a Magalu respondeu
+**403 na primeira requisição**. **Certo:** desktop usa o UA real; mobile usa UA Android com a
+versão do Chrome que está rodando (`capture.context_options`). É o R14 do RAC, agora pela versão.
+
+### S10. Página de bloqueio que não parece bloqueio (12/11/2026)
+**Errado:** a página do Akamai na Magalu ("Não é possível acessar a página (Erro 403)") não
+tinha nenhuma frase conhecida, e a captura saiu "OK, 0 peças". **Certo:** o status HTTP da
+página principal entra como evidência (`manifest.http_status`; 403/429 com pouca imagem =
+bloqueio) e a frase da Magalu está em `BLOCK_PHRASES`.
