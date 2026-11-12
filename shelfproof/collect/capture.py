@@ -212,7 +212,13 @@ class _ImageSink:
         except Exception as exc:
             self._fail("resposta", exc)
 
+    # Corpo que o navegador nunca guardou (pixel de metrica do ML, resposta de pagina que ja navegou):
+    # nao e criativo perdido, entao nao conta como falha da captura
+    _NOT_A_LOSS = ("No data found for resource", "navigated away from", "unavailable for redirect")
+
     def _fail(self, what: str, exc: Exception) -> None:
+        if any(s in str(exc) for s in self._NOT_A_LOSS):
+            return
         if len(self.failures) < 5:  # amostra para o manifest; nunca silencioso
             self.failures.append(f"{what}: {type(exc).__name__}: {str(exc)[:160]}")
 

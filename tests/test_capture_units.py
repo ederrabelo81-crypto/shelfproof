@@ -188,3 +188,12 @@ def test_api_octet_stream_nao_vira_falha_de_imagem(tmp_path: Path):
                            RuntimeError("CSP violation"), rtype="fetch"))
     sink.flush()
     assert sink.pending == [] and sink.failures == []
+
+
+def test_pixel_sem_corpo_nao_e_falha(tmp_path: Path):
+    # ML 12/11/2026: placements.mercadolibre.com/metrics/canary/increment (pixel) sem corpo guardado
+    sink = _ImageSink(tmp_path, min_bytes=4000)
+    err = RuntimeError("Protocol error (Network.getResponseBody): No data found for resource with given identifier")
+    sink.on_response(_resp("https://placements.mercadolibre.com/metrics/canary/increment?name=x", "image/gif", err))
+    sink.flush()
+    assert sink.failures == []
