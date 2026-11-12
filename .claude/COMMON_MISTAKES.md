@@ -85,11 +85,14 @@ Amazon `adplacements:*` e parte do Mercado Ads não dizem quem pagou; o
 "Sponsored Brands" da Neutrogena só tinha o logo na imagem. **Certo:** `Nao
 identificado` + evidência "precisa da leitura visual" até a fase 3 (visão).
 
-### S8. Ler o corpo da imagem dentro do handler de `response` (12/11/2026)
-**Errado:** `response.body()` dentro de `page.on("response", ...)`, com `except: pass`.
-No Windows (Playwright 1.60) falhava sempre e a captura saía com **0 imagens**, sem erro.
-**Certo:** o handler só anota a resposta; `_ImageSink.flush()` lê os corpos depois e
-`fetch_missing()` busca de novo, pelo endereço, o que faltou. Falha vai para `manifest.errors`.
+### S8. Imagem que o servidor não declara como imagem (12/11/2026)
+**Sintoma:** no Windows o e2e saía com **0 imagens**. **Causa real:** o `http.server` do
+teste usa o `mimetypes`, que no Windows lê o registro, e `.webp` saía como
+`application/octet-stream`; o robô só aceitava `image/*`. (Primeiro suspeitamos do
+`response.body()` dentro do handler de eventos: não era, mas ler o corpo depois ficou.)
+**Certo:** aceitar `octet-stream` de requisição de imagem e decidir pelos primeiros bytes
+(`capture.sniff_image_type`), porque CDN de verdade também erra o tipo; o handler só anota,
+`flush()` lê os corpos, `fetch_missing()` busca de novo o que faltou, e falha vai para o manifest.
 
 ### S9. User-Agent fixo de outra versão do Chrome (12/11/2026)
 **Errado:** UA "Chrome/131" no contexto de um Chrome 14x via CDP. O `navigator.userAgent`
