@@ -45,6 +45,14 @@ ajuste a regra com teste.
 - **Pago:** código no alt com `_ADS_` (ex.: `MS_1111_ADS_BITLAR_MA` = Bitlar).
 - **Campanha do ML:** demais peças de display (`MS_11a25_TECH_...`, "Cupom Relâmpago").
 
+- **Home anônima (12/11/2026, desktop):** nenhuma peça com `_ADS_`. Os alts do hero agora são
+  frases ("Black Friday. Só hoje!...") e não códigos `MS_...`. O componente `advertising-square`
+  e o `action_id: "advertising"` do JSON da página aparecem **também** nas campanhas do próprio
+  ML (Black Friday, Liquida Full, Especial Música): não são marcador de mídia vendida.
+- **Em aberto:** dois cards de iPhone ("O melhor jeito de levar seu iPhone" → `/loja/apple/...`;
+  "Plano sempre novo" → landing do ML). Destino em loja oficial pode ser display pago pela marca,
+  mas sem marcador concreto ficam `marketplace` até confirmar com quem compra Mercado Ads.
+
 ## Shopee
 - **Pago:** `adsTrackingPayload=` no link (banner de loja `/shop/<id>`).
 - **Lojas Oficiais:** alt começa com "Lojas Oficiais" e a peça traz o selo "Anúncio".
