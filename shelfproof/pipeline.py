@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from urllib.parse import urljoin, urlparse
 from pathlib import Path
@@ -23,6 +24,18 @@ from shelfproof.models import UNKNOWN_ADVERTISER, BBox, Piece
 
 def _norm(u: str) -> str:
     return (u or "").split("#")[0].strip()
+
+
+def _src_key(u: str) -> str:
+    """Imagem sem o sufixo de tamanho: a Shopee serve '<arquivo>@resize_w797_nl.webp' no navegador
+    e '<arquivo>' no <img src> (12/11/2026); o ML troca D_NQ_2X por D_NQ."""
+    if not u:
+        return ""
+    p = urlparse(u)
+    path = re.sub(r"@[^/]*$", "", p.path)
+    path = re.sub(r"\.(webp|jpe?g|png|gif|avif)$", "", path, flags=re.I)
+    path = path.replace("D_NQ_2X_", "D_NQ_").replace("D_NQ_NP_2X_", "D_NQ_NP_")
+    return f"{p.netloc}{path}".lower()
 
 
 def _path_key(u: str, base: str) -> str:
@@ -59,6 +72,10 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
             by_href.setdefault(_norm(e["href"]), e)
 
     base = manifest.get("final_url") or manifest.get("url", "")
+    by_srckey: Dict[str, Dict[str, Any]] = {}
+    for e in sorted(elements, key=lambda e: e.get("visible") is False):
+        by_srckey.setdefault(_src_key(e.get("src", "")), e)
+    img_by_srckey = {_src_key(k): v for k, v in images.items()}
     by_path: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for e in elements:
         if e.get("href") and e.get("w", 0) >= 60:
@@ -67,6 +84,8 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
 
     for p in pieces:
         el: Optional[Dict[str, Any]] = by_src.get(_norm(p.img_src)) or by_href.get(_norm(p.href))
+        if el is None and p.img_src:
+            el = by_srckey.get(_src_key(p.img_src))
         if el is None and not p.img_src and p.href:
             # card de produto sem imagem no HTML (Magalu "Patrocinados", 12/11/2026): link relativo
             # no HTML x absoluto no navegador. Casa pelo caminho, uma vez por elemento.
@@ -82,6 +101,8 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
                 p.extra["image_file"] = images[src]
         if "image_file" not in p.extra and _norm(p.img_src) in images:
             p.extra["image_file"] = images[_norm(p.img_src)]
+        if "image_file" not in p.extra and p.img_src and _src_key(p.img_src) in img_by_srckey:
+            p.extra["image_file"] = img_by_srckey[_src_key(p.img_src)]
 
     # tempo no ar na 1a tela: em quantos frames do carrossel a peca estava visivel
     frames = manifest.get("frames") or []

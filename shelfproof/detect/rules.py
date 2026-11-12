@@ -281,9 +281,64 @@ def _mercadolivre(soup: BeautifulSoup) -> List[Piece]:
     return out
 
 
+_ML_CARD = re.compile(r'"action_id"\s*:\s*"advertising"\s*,\s*"link"\s*:\s*"([^"]+)"')
+
+
+def _ml_brand_cards(html: str) -> List[Piece]:
+    """Cards de display da home do ML (action_id "advertising") que levam uma MARCA.
+
+    O mesmo componente carrega campanha do proprio ML (Black Friday, Liquida Full). Com marca
+    no destino (/loja/apple) ou no texto (iPhone), o espaco e vendido a marca: confirmado por
+    quem compra Mercado Ads em 12/11/2026. Sem marca, e campanha do ML (fica com o detector de display).
+    """
+    import html as _html
+
+    text = _html.unescape(html).replace("\\u002F", "/").replace("\\/", "/")
+    out: List[Piece] = []
+    seen = set()
+    for m in _ML_CARD.finditer(text):
+        link = m.group(1)
+        ctx = text[max(0, m.start() - 1500):m.start()]
+        start = ctx.rfind('"content"')
+        block = ctx[start:] if start >= 0 else ctx[-800:]
+        titles = re.findall(r'"(?:volanta|primary_title|secondary_title|title)"\s*:\s*"([^"]{1,90})"', block)
+        pic = (re.findall(r'"picture"\s*:\s*"(https://[^"]+)"', block) or [""])[-1]
+        loja = re.search(r"/loja/([a-z0-9\-]+)", link)
+        brand = find_brand(loja.group(1).replace("-", " ")) if loja else None
+        where = f"destino /loja/{loja.group(1)}" if brand and loja else ""
+        if not brand:
+            brand = find_brand_first(" ".join(titles))
+            where = f"texto do card '{' '.join(titles)[:60]}'" if brand else ""
+        key = urlparse(link).path or link
+        if not brand or key in seen:
+            continue
+        seen.add(key)
+        out.append(Piece("mercadolivre", "paid", "display", brand, "card de display da home", None,
+                         title=" ".join(titles)[:140], href=link, img_src=pic,
+                         evidence=[f"card de display (action_id advertising) com a marca no {where}",
+                                   "formato vendido a marca (confirmado com comprador de Mercado Ads, 12/11/2026)"]))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Shopee
 # ---------------------------------------------------------------------------
+def _shopee_store_name(alt: str, href: str) -> "tuple[str, str]":
+    """Loja que comprou o banner 'Lojas Oficiais' quando a marca nao esta no dicionario.
+
+    12/11/2026: "Lojas Oficiais Bestway. Piscina..." (nome no alt) e /m/dd-maquinas-v10,
+    /m/bodyaction-v5 (nome so no destino). O destino /m/<loja>-vN e a pagina da loja.
+    """
+    m = re.match(r"\s*lojas oficiais\s+([^.:,;]{2,40}?)\s*[.:,;]", alt, re.I)
+    if m:
+        return m.group(1).strip(), f"loja nomeada no texto do banner: '{m.group(1).strip()}'"
+    s = re.search(r"/m/([a-z0-9\-]+?)(?:-v\d+)?/?(?:[?#]|$)", href)
+    if s and not re.search(r"(campanha|ofertas|cupom|frete|11-11|black)", s.group(1)):
+        name = " ".join(w.capitalize() for w in s.group(1).split("-"))
+        return name, f"loja nomeada no destino /m/{s.group(1)}"
+    return "", ""
+
+
 def _shopee(soup: BeautifulSoup) -> List[Piece]:
     out: List[Piece] = []
     for img in soup.find_all("img"):
@@ -296,9 +351,17 @@ def _shopee(soup: BeautifulSoup) -> List[Piece]:
                              img_src=img_src(img), evidence=["link do banner traz adsTrackingPayload (Shopee Ads)"],
                              extra={"shop_id": sid.group(1) if sid else ""}))
         elif alt.lower().startswith("lojas oficiais") and "/m/" in href:
-            out.append(Piece("shopee", "paid", "official_store", find_brand(alt) or UNKNOWN_ADVERTISER,
+            evidence = ["banner 'Lojas Oficiais' no carrossel principal (espaco vendido a lojas; selo Anuncio na peca)"]
+            extra: Dict[str, str] = {}
+            brand = find_brand(alt)
+            if not brand:
+                brand, how = _shopee_store_name(alt, href)
+                if brand:
+                    evidence.append(how)
+                    extra["needs_review"] = "nome da loja tirado do texto/destino: conferir grafia e incluir em brands.py"
+            out.append(Piece("shopee", "paid", "official_store", brand or UNKNOWN_ADVERTISER,
                              "Lojas Oficiais", 1, title=alt, alt=alt, href=href, img_src=img_src(img),
-                             evidence=["banner 'Lojas Oficiais' no carrossel principal (espaco vendido a lojas; selo Anuncio na peca)"]))
+                             evidence=evidence, extra=extra))
         elif "shopee.com.br/m/" in href and len(alt) > 25:
             out.append(Piece("shopee", "marketplace", "banner", "Shopee", "carrossel principal", 1, title=alt, alt=alt,
                              href=href, img_src=img_src(img), evidence=["banner de campanha /m/ sem marcador de anuncio"],
@@ -372,6 +435,8 @@ def detect(html: str, url: str = "", marketplace: Optional[str] = None) -> List[
         t.decompose()
     rule = RULES.get(key, _generic)
     pieces = rule(soup)
+    if key == "mercadolivre":
+        pieces += _ml_brand_cards(html)
     if key != "generic" and not any(p.is_paid for p in pieces):
         # site conhecido sem nenhum pago: tenta o rotulo generico antes de desistir
         pieces += [p for p in _generic(soup)]

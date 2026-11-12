@@ -49,14 +49,22 @@ ajuste a regra com teste.
   frases ("Black Friday. Só hoje!...") e não códigos `MS_...`. O componente `advertising-square`
   e o `action_id: "advertising"` do JSON da página aparecem **também** nas campanhas do próprio
   ML (Black Friday, Liquida Full, Especial Música): não são marcador de mídia vendida.
-- **Em aberto:** dois cards de iPhone ("O melhor jeito de levar seu iPhone" → `/loja/apple/...`;
-  "Plano sempre novo" → landing do ML). Destino em loja oficial pode ser display pago pela marca,
-  mas sem marcador concreto ficam `marketplace` até confirmar com quem compra Mercado Ads.
+- **Cards de display da marca (pago):** card com `action_id: "advertising"` cuja marca aparece no
+  destino (`/loja/apple`) ou no texto ("IPHONE 18 PRO") é espaço **vendido à marca** — confirmado
+  por quem compra Mercado Ads em 12/11/2026. Sem marca, o mesmo componente é campanha do ML.
+  São `<div>` com imagem de fundo CSS, sem `<img>`: `ELEMENTS_JS` também guarda essas peças.
 
 ## Shopee
 - **Pago:** `adsTrackingPayload=` no link (banner de loja `/shop/<id>`).
 - **Lojas Oficiais:** alt começa com "Lojas Oficiais" e a peça traz o selo "Anúncio".
 - **Campanha da Shopee:** banners `/m/<campanha>` sem marcador.
+- **Quem comprou o "Lojas Oficiais":** marca do dicionário no alt; senão o nome no alt
+  ("Lojas Oficiais Bestway."); senão o destino `/m/<loja>-vN` (`dd-maquinas`, `bodyaction`),
+  com `needs_review` para conferir a grafia.
+- **Imagem:** o `<img src>` traz `<arquivo>` e o navegador baixa `<arquivo>@resize_w797_nl.webp`;
+  o casamento ignora o sufixo de tamanho (`pipeline._src_key`).
+- **Janela de idioma:** opções sem papel de botão; o robô clica "Português (BR)" só dentro da
+  janela "Selecione seu idioma" (o cabeçalho tem o mesmo texto).
 
 ## Loja da marca (midea.com.br)
 - Tudo é `brand_store`. A zona vem de `utmi_pc` (`banner_tv`, `banner_menu`,
