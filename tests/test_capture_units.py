@@ -133,3 +133,38 @@ def test_marcas_novas_da_magalu_sem_falso_positivo():
     assert find_brand("Fone JBL Tune 520BT") == "JBL"
     assert find_brand("Motor 1 HP monofasico") is None
     assert find_brand("Feedback positivo dos clientes") is None
+
+
+def test_produto_patrocinado_e_da_marca_que_vem_primeiro():
+    from shelfproof.detect.brands import find_brand_first
+
+    # Magalu 12/11/2026: 4 notebooks Lenovo tinham saido como "Intel" (processador no titulo)
+    assert find_brand_first("Notebook Gamer Lenovo LOQ 15IRX9 Intel Core i5-14500HX") == "Lenovo"
+    assert find_brand_first("Notebook Samsung Galaxy Book4 Intel Core 5") == "Samsung"
+    assert find_brand_first("Ar-condicionado Springer Midea 12000") == "Springer Midea"
+
+
+def test_card_patrocinado_casa_com_a_posicao_pelo_caminho_do_link(tmp_path: Path):
+    import json
+
+    from shelfproof.pipeline import analyze
+
+    html = """<html><body><h2>Patrocinados</h2><div>
+      <a href="/notebook-lenovo-loq/p/hd5/in/note/?seller_id=x" title="Notebook Lenovo LOQ Intel Core i5">x</a>
+      <a href="/smartphone-oppo-a6s/p/aa6bg/te/oppo/?seller_id=oppo" title="Smartphone OPPO A6s">y</a>
+    </div></body></html>"""
+    (tmp_path / "page.html").write_text(html, encoding="utf-8")
+    (tmp_path / "manifest.json").write_text(json.dumps(
+        {"url": "https://www.magazineluiza.com.br/", "final_url": "https://www.magazineluiza.com.br/",
+         "viewport": {"width": 1440, "height": 900}}), encoding="utf-8")
+    els = [{"src": "https://a-static.mlcdn.com.br/350x350/notebook-lenovo-loq.jpg", "alt": "Imagem do produto",
+            "href": "https://www.magazineluiza.com.br/notebook-lenovo-loq/p/hd5/in/note/?seller_id=x&ads=1",
+            "x": 369, "y": 859, "w": 206, "h": 137},
+           {"src": "https://a-static.mlcdn.com.br/350x350/smartphone-oppo-a6s.jpg", "alt": "Imagem do produto",
+            "href": "https://www.magazineluiza.com.br/smartphone-oppo-a6s/p/aa6bg/te/oppo/?seller_id=oppo&ads=2",
+            "x": 1569, "y": 859, "w": 206, "h": 137}]
+    (tmp_path / "elements.json").write_text(json.dumps(els), encoding="utf-8")
+    pieces = {p.advertiser: p for p in analyze(tmp_path)}
+    assert set(pieces) == {"Lenovo", "OPPO"}
+    assert pieces["Lenovo"].bbox.x == 369 and pieces["OPPO"].bbox.x == 1569
+    assert pieces["OPPO"].bbox.area == 206 * 137

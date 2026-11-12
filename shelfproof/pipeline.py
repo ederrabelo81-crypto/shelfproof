@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from urllib.parse import urljoin, urlparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -22,6 +23,14 @@ from shelfproof.models import UNKNOWN_ADVERTISER, BBox, Piece
 
 def _norm(u: str) -> str:
     return (u or "").split("#")[0].strip()
+
+
+def _path_key(u: str, base: str) -> str:
+    """Host + caminho, sem query: casa link relativo do HTML com o absoluto do navegador."""
+    if not u:
+        return ""
+    p = urlparse(urljoin(base or "", u.strip()))
+    return f"{p.netloc}{p.path}".rstrip("/").lower() if p.netloc else ""
 
 
 def _load_json(p: Path, default: Any) -> Any:
@@ -49,8 +58,23 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
         if e.get("href"):
             by_href.setdefault(_norm(e["href"]), e)
 
+    base = manifest.get("final_url") or manifest.get("url", "")
+    by_path: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for e in elements:
+        if e.get("href") and e.get("w", 0) >= 60:
+            by_path[_path_key(e["href"], base)].append(e)
+    used_by_path: set = set()
+
     for p in pieces:
         el: Optional[Dict[str, Any]] = by_src.get(_norm(p.img_src)) or by_href.get(_norm(p.href))
+        if el is None and not p.img_src and p.href:
+            # card de produto sem imagem no HTML (Magalu "Patrocinados", 12/11/2026): link relativo
+            # no HTML x absoluto no navegador. Casa pelo caminho, uma vez por elemento.
+            for cand in by_path.get(_path_key(p.href, base), []):
+                if id(cand) not in used_by_path:
+                    used_by_path.add(id(cand))
+                    el = cand
+                    break
         if el:
             p.bbox = BBox(el["x"], el["y"], el["w"], el["h"], viewport_h=vh)
             src = _norm(el.get("src", ""))
