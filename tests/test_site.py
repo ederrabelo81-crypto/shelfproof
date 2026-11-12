@@ -22,6 +22,12 @@ def test_publica_showroom_e_monta_indice(tmp_path: Path):
     assert not (dest / "contact_sheet.jpg").exists()  # folha de revisao nao vai para o ar
     idx = (site / "index.html").read_text(encoding="utf-8")
     assert 'href="2026-11-11/"' in idx and "11.11" in idx and "espaços pagos" in idx
+    assert 'http-equiv="refresh" content="0; url=2026-11-11/"' in idx  # home abre o dia mais recente
+    assert 'href="../2026-11-11/"' in (site / "dias" / "index.html").read_text(encoding="utf-8")
+    ev = json.loads((site / "events.json").read_text(encoding="utf-8"))
+    assert ev[0]["slug"] == "2026-11-11" and ev[0]["date"] == "11/11/2026"
+    # pagina do dia refeita com o template atual: tem o seletor de dia
+    assert 'id="daySel"' in (dest / "index.html").read_text(encoding="utf-8")
     vj = json.loads((site / "vercel.json").read_text())
     assert vj["cleanUrls"] is True and vj["trailingSlash"] is True  # caminhos relativos do Showroom
     # republicar o mesmo slug substitui, nao duplica

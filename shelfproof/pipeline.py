@@ -32,6 +32,11 @@ def _src_key(u: str) -> str:
     if not u:
         return ""
     p = urlparse(u)
+    # Amazon: /images/I/<id>.<modificadores>.jpg -- o navegador pede outra qualidade/formato
+    # (_FMavif_..._QL54_) do mesmo <id> que o HTML traz (_QL80_). 12/11/2026: 19 pecas sem imagem.
+    m = re.match(r"(/images/I/[^./]+)\.", p.path)
+    if m and "media-amazon" in p.netloc:
+        return f"{p.netloc}{m.group(1)}".lower()
     path = re.sub(r"@[^/]*$", "", p.path)
     path = re.sub(r"\.(webp|jpe?g|png|gif|avif)$", "", path, flags=re.I)
     path = path.replace("D_NQ_2X_", "D_NQ_").replace("D_NQ_NP_2X_", "D_NQ_NP_")

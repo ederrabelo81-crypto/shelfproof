@@ -40,6 +40,9 @@ button { font: inherit; color: inherit; }
 .rec { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .rec i { width: 9px; height: 9px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 10px #ff4d4d; }
 .bar nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.daysel { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.daysel[hidden] { display: none; }
+.daysel select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
 .bar nav a { text-decoration: none; font-size: 13px; color: var(--muted); padding: 6px 10px; border-radius: 999px; border: 1px solid transparent; }
 .bar nav a:hover { color: var(--text); border-color: var(--line); }
 
@@ -181,6 +184,7 @@ details.method ul { padding-left: 18px; max-width: 80ch; }
 <header class="bar"><div class="bar-in">
   <span class="brand">Shelf<b>Proof</b></span>
   <span class="rec"><i></i>{{ header_line }}</span>
+  <label class="daysel" id="daySelWrap" hidden><span>Dia</span><select id="daySel" aria-label="Escolher o dia da coleta"></select></label>
   <nav aria-label="Seções"><a href="#wall">Video wall</a><a href="#board">Quem pagou</a><a href="#own">Propriedade</a><a href="#proof">Prova</a></nav>
 </div></header>
 
@@ -417,6 +421,22 @@ function renderProof() {
   });
 }
 renderProof();
+
+// seletor de dia: so existe no site publicado (../events.json); local ou no artifact fica escondido
+(function daySelector() {
+  if (location.protocol === 'file:') return;
+  fetch('../events.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((list) => {
+    if (!Array.isArray(list) || !list.length) return;
+    const here = location.pathname.split('/').filter(Boolean).pop() || '';
+    const sel = $('#daySel');
+    list.forEach((e) => {
+      const o = el('option', null, e.date + ' · ' + e.event + ' · ' + e.paid + ' pagos');
+      o.value = e.slug; if (e.slug === here) o.selected = true; sel.append(o);
+    });
+    sel.addEventListener('change', () => { location.href = '../' + encodeURIComponent(sel.value) + '/'; });
+    $('#daySelWrap').hidden = false;
+  }).catch(() => {});
+})();
 
 // lightbox
 const lb = $('#lb'); let lbKey = null, lbI = 0;

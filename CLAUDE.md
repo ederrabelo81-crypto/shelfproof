@@ -90,7 +90,7 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 56 testes; os e2e pulam sem Chrome
+pytest -q                                   # 57 testes; os e2e pulam sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
@@ -117,6 +117,8 @@ Windows (PC coletor): `scripts\coleta_evento.bat "Black Friday" 27/11/2026`.
 Publicar no site (Vercel, projeto `shelfproof-showroom`; `site/` fica fora do git):
 `scripts\publicar_site.bat runs\showroom\2026-11-12 2026-11-12`
 (= `python -m shelfproof site <showroom> --slug <slug>` + `npx vercel deploy site --prod`).
+A home abre o dia mais recente; o seletor "Dia" no topo de cada Showroom lê `site/events.json`.
+O `site/` acumula os dias no PC: não apague a pasta entre publicações.
 
 ## Convenções
 
