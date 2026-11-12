@@ -48,8 +48,12 @@ HTML nao diz quem pagou. Sua tarefa e dizer qual MARCA anunciante aparece na ima
 Regras:
 - So responda uma marca se ela estiver ESCRITA ou com o LOGOTIPO visivel na imagem. Leia; nao deduza.
 - Nao deduza a marca pela categoria do produto, pela cor, pelo formato do aparelho ou pelo estilo.
+- advertiser e a EMPRESA/MARCA dona, nao o nome do produto, modelo ou franquia
+  ("iPhone 17" -> "Apple"; "Galaxy A57" -> "Samsung"; "Aspire Go" -> "Acer").
 - Se aparecerem varias marcas, responda a que assina a peca (logo principal, chamada "na loja X",
-  marca do produto em destaque). Se nenhuma assina claramente, brand_visible=false.
+  marca do produto em destaque). Marcas parceiras em selo (Intel Inside, Windows) nao assinam.
+  Se duas empresas dividem a peca sem uma assinatura clara (ex.: jogo de uma editora sobre
+  console de outra), brand_visible=false.
 - O nome do proprio marketplace (Amazon, Mercado Livre, Magalu, Casas Bahia, Shopee) nao e o
   anunciante, a menos que a peca anuncie um produto de marca propria dele (ex.: Echo/Alexa, Kindle).
 - text_seen: copie literalmente o texto ou descreva o logotipo que sustenta a resposta.
@@ -147,6 +151,11 @@ def accept(reading: VisualReading, marketplace: str) -> Optional[str]:
     return find_brand(name) or name
 
 
+def is_known_brand(name: str) -> bool:
+    """A marca esta no dicionario (brands.py)? Fora dele, o nome lido precisa de conferencia humana."""
+    return find_brand(name) == name
+
+
 def _load_cache(run_dir: Path) -> Dict[str, Any]:
     try:
         return json.loads((run_dir / "vision.json").read_text(encoding="utf-8"))
@@ -162,7 +171,7 @@ def resolve_unknown_advertisers(pieces: List[Piece], run_dir: Path, reader: Visi
     """
     run_dir = Path(run_dir)
     cache = _load_cache(run_dir)
-    stats = dict(candidates=0, api_calls=0, cached=0, resolved=0, no_image=0, errors=0)
+    stats = dict(candidates=0, api_calls=0, cached=0, resolved=0, needs_review=0, no_image=0, errors=0)
     model_label = model_label or getattr(reader, "model", "") or "visao"
     for p in pieces:
         if not (p.is_paid and p.advertiser == UNKNOWN_ADVERTISER):
@@ -201,6 +210,10 @@ def resolve_unknown_advertisers(pieces: List[Piece], run_dir: Path, reader: Visi
         if name:
             p.advertiser = name
             p.extra["advertiser_source"] = "vision"
+            if not is_known_brand(name):
+                # nome novo (ou nome de produto em vez de empresa): vai para a revisao da folha de contato
+                p.extra["needs_review"] = "marca fora do dicionario: confirmar e incluir em brands.py"
+                stats["needs_review"] += 1
             p.evidence = [e for e in p.evidence if "precisa da leitura visual" not in e]
             p.evidence.append(f"anunciante lido na imagem: '{reading.text_seen[:80]}' "
                               f"({entry['model']}, confianca {reading.confidence})")
