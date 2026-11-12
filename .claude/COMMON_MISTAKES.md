@@ -131,3 +131,9 @@ cobrindo o carrossel: frames e print mostram a janela, não a vitrine. **Certo:*
 `capture.dismiss_overlays` clica, como um cliente, só em botões de nome exato
 (`Português (BR)`, `Aceitar todos os cookies`, `Entendi`...) e grava em `manifest.dismissed`.
 Nunca clicar em login, captcha ou "Configurações".
+
+### S15. Mesma imagem com outro nome no navegador (12/11/2026)
+**Errado:** casar a peça com a imagem baixada pelo endereço exato. A Shopee põe `<arquivo>` no
+`<img src>` e o navegador baixa `<arquivo>@resize_w797_nl.webp`; o ML troca `D_NQ_2X_` por
+`D_NQ_`. Resultado: 3 "Nao identificado" sem imagem, e a visão nem foi chamada. **Certo:**
+`pipeline._src_key` (sem sufixo de tamanho e sem extensão) como segundo critério.

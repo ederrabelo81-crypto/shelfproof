@@ -39,6 +39,10 @@ BRANDS: List[Tuple[str, List[str]]] = [
     # vistos na Magalu em 12/11/2026 (vitrine Patrocinados) e comuns em celular/informatica.
     # Fora de proposito: HP (cavalo-vapor em motor/bomba) e Positivo (palavra comum).
     ("OPPO", [r"\boppo\b"]),
+    # lojas oficiais da Shopee vistas em 12/11/2026
+    ("Bestway", [r"bestway"]),
+    ("Body Action", [r"body\s*action"]),
+    ("DD Máquinas", [r"\bdd[\s\-]?m[aá]quinas"]),
     ("Realme", [r"\brealme\b"]),
     ("Multilaser", [r"multilaser"]),
     ("JBL", [r"\bjbl\b"]),

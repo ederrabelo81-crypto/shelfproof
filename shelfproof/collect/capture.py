@@ -117,6 +117,27 @@ ELEMENTS_JS = r"""
       label, slot_id: slotId,
     });
   });
+  // peca desenhada como fundo CSS dentro de link (ML 12/11/2026: cards de iPhone sem <img>)
+  document.querySelectorAll('a, a *').forEach((el, i) => {
+    const bg = getComputedStyle(el).backgroundImage || '';
+    const m = bg.match(/url\(["']?(https?:[^"')]+)["']?\)/);
+    if (!m) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 120 || r.height < 60) return;
+    const a = el.closest('a');
+    let op = 1, hidden = false;
+    for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      op *= parseFloat(cs.opacity || '1');
+      if (cs.visibility === 'hidden' || cs.display === 'none') { hidden = true; break; }
+    }
+    out.push({
+      i: 100000 + i, src: m[1], alt: (el.innerText || '').trim().slice(0, 120),
+      href: a ? a.href : '', x: r.left + sx, y: r.top + sy, w: r.width, h: r.height,
+      nw: 0, nh: 0, visible: !hidden && op > 0.05, opacity: Math.round(op * 100) / 100,
+      on_top: null, label: '', slot_id: '', background: true,
+    });
+  });
   return out;
 }
 """
@@ -392,13 +413,47 @@ OVERLAY_BUTTONS = [
 ]
 
 
+# Opcoes de idioma que nao sao <button> (Shopee 12/11/2026: o seletor nao tem papel de botao).
+# Clique por TEXTO exato so aqui: nome de idioma nao se confunde com login nem captcha.
+# So com a janela "Selecione seu idioma" aberta, e na opcao mais baixa da tela: o mesmo texto existe
+# no seletor de idioma do cabecalho, que nao deve ser clicado.
+OVERLAY_TEXTS = [re.compile(r"^\s*portugu[eê]s\s*\(br\)\s*$", re.I)]
+LANGUAGE_DIALOG = re.compile(r"selecione seu idioma", re.I)
+
+
+def _click_language_option(page: Any, pat: Any) -> str:
+    """Clica a opcao de idioma DENTRO da janela de escolha (a mais baixa entre as visiveis)."""
+    if not page.get_by_text(LANGUAGE_DIALOG).first.is_visible():
+        return ""
+    loc = page.get_by_text(pat)
+    best, best_y = None, -1.0
+    for i in range(min(loc.count(), 5)):
+        b = loc.nth(i)
+        box = b.bounding_box() if b.is_visible() else None
+        if box and box["y"] > best_y:
+            best, best_y = b, box["y"]
+    if best is None:
+        return ""
+    name = (best.inner_text(timeout=1000) or "").strip()
+    best.click(timeout=2000)
+    return name
+
+
 def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
     """Fecha janelas que cobrem a vitrine (idioma, cookies). Devolve o que foi clicado, para o manifest."""
     clicked: List[str] = []
     for _ in range(passes):
         hit = False
-        for pat in OVERLAY_BUTTONS:
+        targets = [("button", p) for p in OVERLAY_BUTTONS] + [("text", p) for p in OVERLAY_TEXTS]
+        for kind, pat in targets:
             try:
+                if kind == "text":
+                    name = _click_language_option(page, pat)
+                    if name:
+                        clicked.append(name)
+                        hit = True
+                        time.sleep(random.uniform(0.6, 1.2))
+                    continue
                 loc = page.get_by_role("button", name=pat)
                 for i in range(min(loc.count(), 3)):
                     b = loc.nth(i)

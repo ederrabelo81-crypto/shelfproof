@@ -197,3 +197,40 @@ def test_pixel_sem_corpo_nao_e_falha(tmp_path: Path):
     sink.on_response(_resp("https://placements.mercadolibre.com/metrics/canary/increment?name=x", "image/gif", err))
     sink.flush()
     assert sink.failures == []
+
+
+def test_cards_de_marca_do_ml_sao_pagos_e_campanha_do_ml_nao():
+    from shelfproof.detect.rules import detect
+
+    def card(t1, t2, link):
+        return ('{&quot;content&quot;:{&quot;texts&quot;:{&quot;primary_title&quot;:&quot;%s&quot;,'
+                '&quot;secondary_title&quot;:&quot;%s&quot;},&quot;images&quot;:{&quot;picture&quot;:'
+                '&quot;https://http2.mlstatic.com/D_NQ_2X_1-MLA9-OO.webp&quot;}},&quot;actions&quot;:{&quot;content_link&quot;:'
+                '{&quot;action_id&quot;:&quot;advertising&quot;,&quot;link&quot;:&quot;%s&quot;}}}' % (t1, t2, link))
+    html = ('<html><body><div data-state="' + card("O MELHOR JEITO DE", "LEVAR SEU IPHONE",
+            "https://lista.mercadolivre.com.br/loja/apple/lista/celulares") +
+            card("VENHA APROVEITAR", "AS OFERTAS", "https://www.mercadolivre.com.br/black-friday") +
+            card("PLANO SEMPRE NOVO", "IPHONE 18 PRO CHEGOU", "https://www.mercadolivre.com.br/landing/plano-sempre-novo") +
+            '"></div></body></html>')
+    paid = [p for p in detect(html, "https://www.mercadolivre.com.br/") if p.is_paid]
+    assert [(p.advertiser, p.href.split("/")[-2] if "loja" in p.href else p.href.split("/")[-1]) for p in paid] == \
+        [("Apple", "lista"), ("Apple", "plano-sempre-novo")]
+    assert any("/loja/apple" in e for e in paid[0].evidence)
+    assert all("Black" not in p.title for p in paid)
+
+
+def test_loja_oficial_da_shopee_pelo_texto_ou_destino():
+    from shelfproof.detect.rules import _shopee_store_name
+
+    assert _shopee_store_name("Lojas Oficiais Bestway. Piscina Steel", "/m/bestway-v10")[0] == "Bestway"
+    assert _shopee_store_name("Lojas Oficiais. Pistola de pintura", "/m/dd-maquinas-v10")[0] == "Dd Maquinas"
+    assert _shopee_store_name("Lojas Oficiais. Cupons", "/m/campanha-11-11")[0] == ""
+
+
+def test_imagem_casa_sem_o_sufixo_de_tamanho():
+    from shelfproof.pipeline import _src_key
+
+    a = "https://down-br.img.susercontent.com/file/br-11134258-820mf-mvd89p7up2ptce"
+    b = a + "@resize_w797_nl.webp"
+    assert _src_key(a) == _src_key(b)
+    assert _src_key("https://http2.mlstatic.com/D_NQ_2X_7-MLA1-OO.webp") == _src_key("https://http2.mlstatic.com/D_NQ_7-MLA1-OO.webp")
