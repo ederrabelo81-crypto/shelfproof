@@ -1,9 +1,11 @@
 """Site estatico com os Showrooms publicados (Vercel).
 
     site/
-      index.html          lista dos eventos (gerada a cada publicacao)
-      vercel.json         URLs limpas
-      2026-11-12/         copia do Showroom do dia (index.html + img/ + logo/ + data.json)
+      index.html          abre o dia mais recente (e lista todos, se o JS estiver desligado)
+      dias/index.html     lista de todos os dias
+      events.json         dias publicados: alimenta o seletor "Dia" no topo de cada Showroom
+      vercel.json         URLs com barra final
+      2026-11-12/         Showroom do dia (index.html refeito com o template atual + img/ + logo/ + data.json)
 
 O site fica FORA do git (site/ no .gitignore): as pecas sao criativos de terceiros e o
 repositorio e publico. Publicar = gerar a pasta e subir com a CLI da Vercel
@@ -32,6 +34,11 @@ def add_showroom(showroom_dir: Path, site_dir: Path, slug: str) -> Path:
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(showroom_dir, dest, ignore=lambda d, names: [n for n in names if n in SKIP])
+    # refaz a pagina com o template ATUAL (seletor de dia, correcoes), a partir dos dados do dia
+    from shelfproof.render.showroom import render
+
+    d = json.loads((dest / "data.json").read_text(encoding="utf-8"))
+    render(d["context"], d["data"], dest)
     # trailingSlash: /2026-11-12 vira /2026-11-12/. Sem a barra, img/x.webp resolveria para /img/x.webp
     # (fora da pasta do evento) e a pagina abriria sem pecas.
     (site_dir / "vercel.json").write_text(json.dumps({"cleanUrls": True, "trailingSlash": True}, indent=1),
@@ -61,11 +68,15 @@ def _date_key(s: Dict[str, Any]) -> str:
 
 
 def write_index(site_dir: Path) -> Path:
+    site_dir = Path(site_dir)
     events: List[Dict[str, Any]] = []
-    for d in sorted(Path(site_dir).iterdir()):
+    for d in sorted(site_dir.iterdir()):
         if d.is_dir() and (d / "data.json").exists():
             events.append(_summary(d))
     events.sort(key=_date_key, reverse=True)
+    (site_dir / "events.json").write_text(json.dumps(
+        [{k: e[k] for k in ("slug", "date", "event", "paid", "advertisers")} for e in events],
+        ensure_ascii=False, indent=1), encoding="utf-8")
     cards = []
     for e in events:
         top = " · ".join(f"{html.escape(a)} {n}" for a, n in e["top"]) or "sem anunciante identificado"
@@ -105,6 +116,12 @@ p.lede {{ color: var(--muted); margin: 0; max-width: 60ch; line-height:1.5; }}
 </div>
 </main></body></html>
 """
-    out = Path(site_dir) / "index.html"
+    (site_dir / "dias").mkdir(exist_ok=True)
+    (site_dir / "dias" / "index.html").write_text(page.replace('href="', 'href="../'), encoding="utf-8")
+    out = site_dir / "index.html"
+    if events:
+        latest = html.escape(events[0]["slug"])
+        # a home abre o dia mais recente; o seletor "Dia" no topo troca de dia
+        page = page.replace("<title>", f'<meta http-equiv="refresh" content="0; url={latest}/">\n<title>', 1)
     out.write_text(page, encoding="utf-8")
     return out

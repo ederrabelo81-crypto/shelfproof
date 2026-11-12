@@ -254,3 +254,13 @@ def test_marca_de_componente_nao_e_anunciante():
     (p,) = _ml_brand_cards(page("https://www.mercadolivre.com.br/ofertas/sf-friday"))
     assert p.advertiser == "Nao identificado" and p.is_paid
     assert any("leitura visual" in e for e in p.evidence)
+
+
+def test_imagem_da_amazon_casa_sem_os_modificadores():
+    from shelfproof.pipeline import _src_key
+
+    base = "https://m.media-amazon.com/images/I/71abcDEF12L."
+    html = base + "_CB791431263,T1_SF1282.5,2052_QL80_.jpg?aicid=homepage-single-creative-card"
+    browser = base + "_CB791431263,T1_FMavif_SF1282.5,2052_QL54_.jpg?aicid=homepage-single-creative-card"
+    other = "https://m.media-amazon.com/images/I/81zzzzzzzzL._SF1282.5,2052_QL80_.jpg"
+    assert _src_key(html) == _src_key(browser) != _src_key(other)
