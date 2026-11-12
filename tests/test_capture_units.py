@@ -113,3 +113,23 @@ def test_targets_marcam_anon_warm_nos_sites_com_akamai():
     targets = json.loads((Path(__file__).resolve().parents[1] / "config" / "targets.json").read_text(encoding="utf-8"))
     warm = {t["name"] for t in targets["targets"] if t.get("session") == "anon_warm"}
     assert warm == {"Magalu", "Casas Bahia"}
+
+
+def test_redirect_nao_e_falha_de_imagem(tmp_path: Path):
+    # Magalu 12/11/2026: /api/reverse-proxy/event responde 302 com tipo de imagem
+    sink = _ImageSink(tmp_path, min_bytes=4000)
+    r = _resp("https://www.magazineluiza.com.br/api/reverse-proxy/event?x", "image/gif", RuntimeError("redirect"))
+    r.status = 302
+    sink.on_response(r)
+    sink.flush()
+    assert sink.index == {} and sink.failures == []
+
+
+def test_marcas_novas_da_magalu_sem_falso_positivo():
+    from shelfproof.detect.brands import find_brand
+
+    assert find_brand("Smartphone OPPO A6s 256GB 8GB RAM") == "OPPO"
+    assert find_brand("/smartphone-oppo-a6x-128gb/p/241078200/te/oppo/") == "OPPO"
+    assert find_brand("Fone JBL Tune 520BT") == "JBL"
+    assert find_brand("Motor 1 HP monofasico") is None
+    assert find_brand("Feedback positivo dos clientes") is None
