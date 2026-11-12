@@ -16,7 +16,7 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 ## Fase 2 — tarefas iniciais (para a primeira sessão no Claude Code)
 
 1. `pip install -r requirements.txt`, `playwright install chromium`, copiar `.env.example` para `.env`.
-2. `pytest -q` (deve dar 44 passados no PC, inclusive o e2e).
+2. `pytest -q` (deve dar 46 passados no PC, inclusive o e2e).
 3. `scripts\coleta_evento.bat` **não** ainda: começar por uma URL:
    `python -m shelfproof capture https://www.magazineluiza.com.br/ --session anon_warm` (Magalu e Casas Bahia
    precisam da sessão aquecida; ver COMMON_MISTAKES S11).

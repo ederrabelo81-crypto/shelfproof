@@ -168,3 +168,23 @@ def test_card_patrocinado_casa_com_a_posicao_pelo_caminho_do_link(tmp_path: Path
     assert set(pieces) == {"Lenovo", "OPPO"}
     assert pieces["Lenovo"].bbox.x == 369 and pieces["OPPO"].bbox.x == 1569
     assert pieces["OPPO"].bbox.area == 206 * 137
+
+
+def test_casas_bahia_anunciante_nomeado_no_vtr_name():
+    from shelfproof.detect.rules import _cb_vtr_advertiser, detect
+
+    assert _cb_vtr_advertiser(["Ads", "CB", "v2", "Belmicro", "Desk", "Nov-2026"]) == "Belmicro"
+    assert _cb_vtr_advertiser(["Ads", "CB", "11.11", "WAP", "Desk", "port", "Nov-2026"]) == "WAP"
+    assert _cb_vtr_advertiser(["Ads", "CB", "v2", "Desk"]) == ""
+    html = ('<a href="https://www.casasbahia.com.br/x?vtr_name=Ads_CB%20_v2_Belmicro_Desk__Nov-2026">'
+            '<img alt="Banner Casas Bahia de Aquecimento Black Friday" src="https://img/a.avif"></a>')
+    (p,) = [p for p in detect(html, "https://www.casasbahia.com.br/") if p.is_paid]
+    assert p.advertiser == "Belmicro" and any("nomeado no vtr_name" in e for e in p.evidence)
+
+
+def test_api_octet_stream_nao_vira_falha_de_imagem(tmp_path: Path):
+    sink = _ImageSink(tmp_path, min_bytes=4000)
+    sink.on_response(_resp("https://retail.googleapis.com/v2/x", "application/octet-stream",
+                           RuntimeError("CSP violation"), rtype="fetch"))
+    sink.flush()
+    assert sink.pending == [] and sink.failures == []

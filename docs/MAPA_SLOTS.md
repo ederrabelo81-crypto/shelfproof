@@ -20,6 +20,11 @@ ajuste a regra com teste.
 ## Casas Bahia
 - **Marcador:** `vtr_name=Ads_CB_<data>_<Marca>_<Desk|Mob>...` no link.
 - **Campanha própria:** `vtr_name=<AAAAMMDD>gcb...` (ex.: `20261110gcbespec11.11gcbtelgcbbtv`).
+- **Anunciante fora do dicionário:** o token antes de `Desk|Mob` é quem comprou
+  (12/11/2026: `Ads_CB_v2_Belmicro_Desk` = Belmicro, distribuidora; a visão leu "HQ", marca
+  dos produtos na peça). O nome do vtr_name vale mais que a leitura da imagem.
+- **Sessão aquecida:** a vitrine "indicados com base nas suas visualizações" depende do
+  histórico do perfil. Fica `marketplace`, mas não entra em comparação entre datas.
 - Banners de oferta do varejista podem destacar uma marca (Philips, Midea) sem
   ser mídia vendida: ficam `marketplace` com `extra.featured_brand`.
 
@@ -29,6 +34,11 @@ ajuste a regra com teste.
 - **Sponsored Brands / display de produto:** rótulo "Patrocinado" + link `aax-*.amazon.com`;
   marca no título do bloco ("Ofertas Nivea") ou só na imagem (Neutrogena → leitura visual).
 - **Gateway/hero:** imagens `_SF1282...`, `_SR428,684`, `DossierVisualNav` = campanha da Amazon.
+
+- **Home anônima (12/11/2026, desktop, Chrome real):** nenhum rótulo "Patrocinado", nenhum
+  `adplacements:*` e nenhum iframe de anúncio no DOM nem no print. A vitrine inteira era da
+  própria Amazon ("Black dos Sonhos", Prime Video, Echo, Kindle). As peças pagas do 11.11 vieram
+  da sessão **logada** (S1). Na home anônima, "0 pagas" é o dado, não falha do detector.
 
 ## Mercado Livre
 - **Peças de display:** link `click1.mercadolivre.com.br/display/clicks/...`.
