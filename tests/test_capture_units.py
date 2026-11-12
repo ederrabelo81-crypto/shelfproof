@@ -21,8 +21,9 @@ class FakeResp(SimpleNamespace):
         return self._body
 
 
-def _resp(url, ctype="image/webp", body=BIG):
-    return FakeResp(url=url, headers={"content-type": ctype}, _body=body)
+def _resp(url, ctype="image/webp", body=BIG, rtype="image"):
+    return FakeResp(url=url, headers={"content-type": ctype}, _body=body,
+                    request=SimpleNamespace(resource_type=rtype))
 
 
 def test_sink_anota_no_evento_e_le_o_corpo_depois(tmp_path: Path):
@@ -36,6 +37,17 @@ def test_sink_anota_no_evento_e_le_o_corpo_depois(tmp_path: Path):
     assert list(sink.index) == ["https://a/1.webp"]
     assert (tmp_path / sink.index["https://a/1.webp"]).read_bytes() == BIG
     assert sink.failures and "no body" in sink.failures[0]  # falha registrada, nao engolida
+
+
+def test_imagem_servida_como_octet_stream_e_reconhecida_pelos_bytes(tmp_path: Path):
+    # no Windows o servidor de teste mandava .webp como application/octet-stream (12/11/2026)
+    webp = b"RIFF\x00\x00\x00\x00WEBPVP8 " + b"x" * 5000
+    sink = _ImageSink(tmp_path, min_bytes=4000)
+    sink.on_response(_resp("https://a/banner.webp", "application/octet-stream", webp))
+    sink.on_response(_resp("https://a/app.js", "application/octet-stream", BIG, rtype="script"))
+    sink.on_response(_resp("https://a/blob", "application/octet-stream", BIG))  # nao e imagem
+    sink.flush()
+    assert list(sink.index) == ["https://a/banner.webp"] and sink.index["https://a/banner.webp"].endswith(".webp")
 
 
 def test_sink_busca_de_novo_o_que_faltou(tmp_path: Path):

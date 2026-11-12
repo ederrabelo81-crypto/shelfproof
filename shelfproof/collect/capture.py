@@ -152,6 +152,27 @@ def _slug(s: str) -> str:
 
 IMAGE_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
              "image/gif": ".gif", "image/avif": ".avif"}
+GENERIC_TYPES = ("application/octet-stream", "binary/octet-stream", "")
+
+
+def sniff_image_type(body: bytes) -> str:
+    """Tipo da imagem pelos primeiros bytes (para servidor que manda octet-stream)."""
+    if body[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if body[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp"
+    if body[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if body[4:12] in (b"ftypavif", b"ftypavis"):
+        return "image/avif"
+    return ""
+
+
+def _is_candidate(ctype: str) -> bool:
+    c = ctype.split(";")[0].strip().lower()
+    return (c.startswith("image/") and "svg" not in c) or c in GENERIC_TYPES
 
 
 class _ImageSink:
@@ -175,7 +196,7 @@ class _ImageSink:
     def on_response(self, response: Any) -> None:
         try:
             ctype = (response.headers or {}).get("content-type", "")
-            if ctype.startswith("image/") and "svg" not in ctype:
+            if _is_candidate(ctype) and response.request.resource_type in ("image", "other", "fetch"):
                 self.pending.append(response)
         except Exception as exc:
             self._fail("resposta", exc)
@@ -187,6 +208,10 @@ class _ImageSink:
     def _save(self, url: str, ctype: str, body: bytes) -> None:
         if url in self.index or len(body) < self.min_bytes:
             return
+        if not ctype.startswith("image/"):
+            ctype = sniff_image_type(body)
+            if not ctype:
+                return  # octet-stream que nao e imagem
         name = hashlib.sha1(url.encode()).hexdigest()[:16] + IMAGE_EXT.get(ctype.split(";")[0].strip(), ".img")
         (self.folder / name).write_bytes(body)
         self.index[url] = name
@@ -212,7 +237,7 @@ class _ImageSink:
             try:
                 r = request.get(url, timeout=15_000)
                 ctype = (r.headers or {}).get("content-type", "")
-                if r.ok and ctype.startswith("image/") and "svg" not in ctype:
+                if r.ok and _is_candidate(ctype):
                     before = len(self.index)
                     self._save(url, ctype, r.body())
                     got += len(self.index) - before

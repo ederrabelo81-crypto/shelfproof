@@ -35,7 +35,12 @@ pytestmark = pytest.mark.skipif(not _has_browser(), reason="sem Playwright/Chrom
 
 @pytest.fixture(scope="module")
 def server():
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(MOCK))
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        # no Windows o mimetypes le o registro e .webp pode sair como application/octet-stream:
+        # o servidor falso precisa dizer o tipo como um CDN de verdade diz
+        extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".webp": "image/webp"}
+
+    handler = functools.partial(Handler, directory=str(MOCK))
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_address[1]}/"
@@ -56,7 +61,9 @@ def test_captura_classifica_e_mede_tempo_no_ar(server, tmp_path):
     assert {"Apple", "Samsung", "Midea", "Intel"} <= paid
     midea = next(p for p in pieces if p.advertiser == "Midea")
     assert midea.bbox is not None and midea.bbox.fold == 1
-    assert midea.extra.get("image_file"), "o criativo baixado precisa estar ligado a peca"
+    assert midea.extra.get("image_file"), (
+        "o criativo baixado precisa estar ligado a peca: "
+        f"images={json.loads((res.run_dir / 'images.json').read_text(encoding='utf-8'))} errors={res.errors}")
     intel = next(p for p in pieces if p.advertiser == "Intel")
     assert intel.bbox.fold >= 2  # abaixo da dobra
     manifest = json.loads((res.run_dir / "manifest.json").read_text(encoding="utf-8"))
