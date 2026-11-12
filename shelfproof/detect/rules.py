@@ -23,7 +23,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from shelfproof.detect.brands import find_brand
+from shelfproof.detect.brands import find_brand, find_brand_first
 from shelfproof.models import UNKNOWN_ADVERTISER, Piece
 
 SPONSOR_LABEL_RE = re.compile(r"^\s*(patrocinad[oa]s?|publicidade|an[uú]ncio|sponsored)\s*$", re.I)
@@ -157,8 +157,10 @@ def _magalu(soup: BeautifulSoup) -> List[Piece]:
             title = _clean(a.get("title") or a.get_text(" "), 140)
             if not title:
                 continue
-            out.append(Piece("magalu", "paid", "sponsored_product", find_brand(title) or UNKNOWN_ADVERTISER,
+            card_img = a.find("img")
+            out.append(Piece("magalu", "paid", "sponsored_product", find_brand_first(title) or UNKNOWN_ADVERTISER,
                              "vitrine Patrocinados", None, title=title, href=a.get("href", ""),
+                             img_src=img_src(card_img) if card_img else "",
                              evidence=["card dentro da vitrine com rotulo 'Patrocinados'"]))
     return out
 

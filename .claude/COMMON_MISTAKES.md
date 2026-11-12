@@ -112,3 +112,15 @@ Chrome real: 403 já na primeira requisição, mesmo com rebrowser e UA real. Na
 janela, a home digitada à mão abria normal. **Certo:** `--session anon_warm` (ou
 `"session": "anon_warm"` no `targets.json`): aba no perfil dedicado nunca logado,
 aquecida na home até o `_abck` validar, como o RAC faz (`cdp_magalu_collection.md`).
+
+### S12. Primeira marca do dicionário em título de produto (12/11/2026)
+**Errado:** `find_brand` devolve a primeira marca **na ordem do dicionário**; em
+"Notebook Lenovo LOQ ... Intel Core i5" deu **Intel**, e 4 notebooks Lenovo viraram
+anúncio da Intel na Magalu. **Certo:** em título de produto, `find_brand_first` (a marca
+que aparece primeiro no texto). O dicionário ordenado continua valendo para slug de campanha.
+
+### S13. Link relativo no HTML x absoluto no navegador (12/11/2026)
+**Errado:** casar peça e elemento só por `src`/`href` exatos. O card "Patrocinados" da Magalu
+tem `href="/notebook-.../p/..."` no HTML e `https://www.magazineluiza.com.br/notebook-...`
+no navegador; 11 peças pagas ficaram com área 0. **Certo:** guardar a imagem do card e,
+sem ela, casar por host + caminho (`pipeline._path_key`), um elemento por peça.

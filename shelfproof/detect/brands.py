@@ -77,6 +77,24 @@ def find_brand(*texts: Optional[str]) -> Optional[str]:
     return None
 
 
+def find_brand_first(*texts: Optional[str]) -> Optional[str]:
+    """Marca que aparece PRIMEIRO no texto (titulo de produto).
+
+    "Notebook Lenovo LOQ ... Intel Core i5" e da Lenovo: o processador vem depois.
+    Empate na mesma posicao segue a prioridade do dicionario ("Springer Midea" antes de "Midea").
+    """
+    blob = " ".join(t for t in texts if t)
+    if not blob:
+        return None
+    best: Optional[Tuple[int, int, str]] = None
+    for rank, (name, pats) in enumerate(_COMPILED):
+        for p in pats:
+            m = p.search(blob)
+            if m and (best is None or (m.start(), rank) < best[:2]):
+                best = (m.start(), rank, name)
+    return best[2] if best else None
+
+
 def find_brands(texts: Iterable[str]) -> List[str]:
     """Todas as marcas presentes (sem repeticao, na ordem do dicionario)."""
     blob = " ".join(t for t in texts if t)
