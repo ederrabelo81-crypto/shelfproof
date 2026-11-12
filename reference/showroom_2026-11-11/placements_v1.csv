@@ -1,0 +1,44 @@
+id,marketplace,slot,position,advertiser,type,creative
+1,Magalu,desk_hypertop_Ads_small,1,Samsung,Patrocinado (retail media),Galaxy A37 / A57
+2,Magalu,desk_home_Promo_large_carrossel_p1,2,Apple,Patrocinado (retail media),iPhone 17 – 11.11
+3,Magalu,desk_home_Ads_large_carrossel_p3,2,Samsung,Patrocinado (retail media),Galaxy A57
+4,Magalu,desk_home_Ads_large_carrossel_p4,2,Midea,Patrocinado (retail media),Seleção Midea nov/26
+5,Magalu,desk_home_Ads_large_carrossel_p5,2,Electrolux,Patrocinado (retail media),Seleção Electrolux nov/26
+6,Magalu,desk_home_large_carrossel_p6_10,2,Magalu,Campanha própria,Antecipadas Black Friday
+7,Magalu,desk_home_large_carrossel_p6_10,2,Magalu,Campanha própria,Montagem
+8,Magalu,desk_home_large_carrossel_p6_10,2,Magalu,Campanha própria,Dia de Telefonia – mais vendidos
+9,Magalu,desk_home_large_carrossel_p6_10,2,Samsung,Patrocinado (retail media),Galaxy Book4
+10,Magalu,desk_home_large_carrossel_p6_10,2,Magalu,Campanha própria,Entrega rápida
+11,Magalu,desk_home_Ads_medium,3,Intel,Patrocinado (retail media),Intel Black Friday
+12,Magalu,desk_home_Ads_trio_superior_1,4,Samsung,Patrocinado (retail media),Samsung TE nov/26
+13,Magalu,desk_home_Ads_trio_superior_2,4,Samsung,Patrocinado (retail media),Samsung TE nov/26
+14,Magalu,desk_home_Ads_trio_superior_3,4,Samsung,Patrocinado (retail media),Samsung TE nov/26
+15,Magalu,desk_home_Ads_trio_meio_5,10,Acer,Patrocinado (retail media),Acer Aspire
+16,Magalu,desktop_magaluempresas,13,Magalu,Campanha própria,Magalu Empresas
+17,Magalu,"Vitrine ""Patrocinados""",—,Samsung,Produto patrocinado,Ar-cond. WindFree AI 12.000 BTUs
+18,Amazon,Sponsored Products,—,Oster,Produto patrocinado,Chaleira Elétrica Inox 2L
+19,Amazon,Sponsored Products,—,Gshield,Produto patrocinado,Filtro de linha Energy Cube
+20,Amazon,Sponsored Products,—,Samsung,Produto patrocinado,"TV Neo QLED 55"" QN70H"
+21,Amazon,Sponsored Products,—,Samsung,Produto patrocinado,"TV Neo QLED 55"" QN70H"
+22,Amazon,Sponsored Products,—,LG,Produto patrocinado,Ar-cond. Dual Inverter AI Voice 12k
+23,Amazon,Sponsored Products,—,Midea,Produto patrocinado,Ar-cond. AirVolution Lite 9k
+24,Amazon,Sponsored Brands,—,Não identificado,Marca patrocinada,Bloco com logo da marca
+25,Amazon,adplacements Gateway desktop-wp-1,—,Não identificado,Display (Amazon Ads),Slot de display na home
+26,Amazon,adplacements Gateway desktop-wp-2,—,Não identificado,Display (Amazon Ads),Slot de display na home
+27,Amazon,adplacements desktop-wp-dynamic,—,Não identificado,Display (Amazon Ads),Slot de display na home
+28,Amazon,adplacements desktop-wp-dynamic-2,—,Não identificado,Display (Amazon Ads),Slot de display na home
+29,Amazon,Hero carrossel,1,Amazon,Campanha própria,Black dos Sonhos 11.11
+30,Mercado Livre,Display MS_1111_ADS_BITLAR_MA,1,Não identificado,Display (Mercado Ads),"Peça codificada 11.11 ""BITLAR"""
+31,Mercado Livre,Display MS_11a25_TECH_PREVENDAGTA_SEG,1,Não identificado,Display (Mercado Ads),Pré-venda Tech 11 a 25/11
+32,Mercado Livre,Hero carrossel,1,Mercado Livre,Campanha própria,Cupons até R$250 OFF / Black Friday até 70%
+33,Casas Bahia,Ads_CB_11.11_Midea_Desk,1,Midea,Banner de marca (Ads),Black Friday Midea – linha branca
+34,Casas Bahia,Ads_CB_11.11_WAP_Desk,1,WAP,Banner de marca (Ads),Black Friday WAP – 24x no carnê
+35,Casas Bahia,Hero carrossel (gcbespec),1,Philips,Banner de oferta do varejista,"Smart TV 65"" 4K"
+36,Casas Bahia,Hero carrossel (gcbespec),1,Midea,Banner de oferta do varejista,Lavadora Midea 15kg
+37,Casas Bahia,Hero carrossel (gcbespec),1,Casas Bahia,Campanha própria,11.11 até R$500 de desconto
+38,Shopee,Banner de loja (adsTrackingPayload),1,Loja 811879342,Banner de loja (Shopee Ads),Loja parceira
+39,Shopee,Lojas Oficiais,1,WAP,Banner de loja oficial,WAP até 40% OFF
+40,Shopee,Lojas Oficiais,1,Multimóveis,Banner de loja oficial,Penteadeira com cômoda
+41,Shopee,Hero carrossel,1,Samsung,Banner de oferta do varejista,Galaxy S25 Ultra 12x
+42,Shopee,Hero carrossel,1,Havaianas,Banner de oferta do varejista,"Havaianas R$59,90"
+43,Shopee,Hero carrossel,1,Lindt,Banner de oferta do varejista,Panettone Trufado

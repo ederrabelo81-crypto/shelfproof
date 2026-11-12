@@ -1,0 +1,11 @@
+{
+  "_comment": "Homes monitoradas em datas quentes. devices: desktop e/ou mobile. Sessao sempre anonima (contexto limpo).",
+  "targets": [
+    {"name": "Amazon",        "url": "https://www.amazon.com.br/",          "devices": ["desktop", "mobile"]},
+    {"name": "Mercado Livre", "url": "https://www.mercadolivre.com.br/",    "devices": ["desktop", "mobile"]},
+    {"name": "Magalu",        "url": "https://www.magazineluiza.com.br/",   "devices": ["desktop", "mobile"]},
+    {"name": "Casas Bahia",   "url": "https://www.casasbahia.com.br/",      "devices": ["desktop", "mobile"]},
+    {"name": "Shopee",        "url": "https://shopee.com.br/",              "devices": ["desktop", "mobile"]},
+    {"name": "Loja Midea",    "url": "https://www.midea.com.br/",           "devices": ["desktop", "mobile"]}
+  ]
+}

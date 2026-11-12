@@ -1,0 +1,665 @@
+{
+ "context": {
+  "page_title": "ShelfProof 11.11 Showroom",
+  "header_line": "COLETA 11.11.2026 · DESKTOP · 6 HOMES",
+  "event_label": "11.11",
+  "sites_text": "Amazon, Mercado Livre, Magalu, Casas Bahia, Shopee e da loja Midea",
+  "method_notes": [
+   "Fonte: as 6 home pages salvas em desktop no dia 11/11/2026, com as imagens que o navegador baixou. Amazon e Mercado Livre estavam logados, então parte das vitrines é personalizada."
+  ]
+ },
+ "data": {
+  "date": "11/11/2026",
+  "mkts": {
+   "amazon": {
+    "name": "Amazon",
+    "color": "#ff9900"
+   },
+   "ml": {
+    "name": "Mercado Livre",
+    "color": "#ffe600"
+   },
+   "magalu": {
+    "name": "Magalu",
+    "color": "#0086ff"
+   },
+   "cb": {
+    "name": "Casas Bahia",
+    "color": "#1d4bff"
+   },
+   "shopee": {
+    "name": "Shopee",
+    "color": "#ee4d2d"
+   },
+   "midea": {
+    "name": "Loja Midea",
+    "color": "#27a3e3"
+   }
+  },
+  "logos": {
+   "Samsung": "samsung",
+   "Midea": "midea",
+   "Electrolux": "electrolux",
+   "Intel": "intel",
+   "Acer": "acer",
+   "Apple": "apple",
+   "Britânia": "britania",
+   "WAP": "wap",
+   "Multimóveis": "multimoveis",
+   "Havaianas": "havaianas",
+   "Bitlar": "bitlar",
+   "Neutrogena": "neutrogena"
+  },
+  "dark_logos": [
+   "samsung",
+   "intel",
+   "acer",
+   "apple",
+   "neutrogena"
+  ],
+  "pieces": [
+   {
+    "m": "amazon",
+    "img": "amazon_06",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Black dos Sonhos 11.11"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_05",
+    "k": "paid",
+    "adv": "Neutrogena",
+    "slot": "Sponsored Brands",
+    "pos": "—",
+    "title": "Bloco de marca patrocinada"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_01",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Gateway card",
+    "pos": "2",
+    "title": "20% off em acessórios tech"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_02",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Gateway card",
+    "pos": "2",
+    "title": "Achadinhos até 15% off"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_03",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Gateway card",
+    "pos": "2",
+    "title": "Fire TV HD"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_07",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Gateway card",
+    "pos": "3",
+    "title": "Até 60% off em cuidados pessoais"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_08",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Gateway card",
+    "pos": "3",
+    "title": "Até 60% off em mercado"
+   },
+   {
+    "m": "amazon",
+    "img": "amazon_09",
+    "k": "own",
+    "adv": "Amazon",
+    "slot": "Gateway card",
+    "pos": "3",
+    "title": "Até 40% off em roupas esportivas"
+   },
+   {
+    "m": "ml",
+    "img": "ml_02",
+    "k": "paid",
+    "adv": "Bitlar",
+    "slot": "Display MS_1111_ADS_BITLAR_MA",
+    "pos": "1",
+    "title": "Descontos imperdíveis para sua casa, até 70% off"
+   },
+   {
+    "m": "ml",
+    "img": "ml_03",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Ofertas que você viu na TV"
+   },
+   {
+    "m": "ml",
+    "img": "ml_05",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Cupons exclusivos até R$250 off"
+   },
+   {
+    "m": "ml",
+    "img": "ml_06",
+    "k": "paid",
+    "adv": "Não identificado",
+    "slot": "Display MS_11a25_TECH_PREVENDAGTA_SEG",
+    "pos": "1",
+    "title": "Pré-venda games: prepare seu setup"
+   },
+   {
+    "m": "ml",
+    "img": "ml_07",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Supermercado até 60% off"
+   },
+   {
+    "m": "ml",
+    "img": "ml_08",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "O melhor da Black Friday, até 70% off"
+   },
+   {
+    "m": "ml",
+    "img": "ml_09",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Vitrine de categoria",
+    "pos": "6",
+    "title": "Brinquedos"
+   },
+   {
+    "m": "ml",
+    "img": "ml_10",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Vitrine de categoria",
+    "pos": "6",
+    "title": "Tudo para o seu mercado"
+   },
+   {
+    "m": "ml",
+    "img": "ml_11",
+    "k": "own",
+    "adv": "Mercado Livre",
+    "slot": "Vitrine de categoria",
+    "pos": "6",
+    "title": "Renove com estilo"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_06",
+    "k": "paid",
+    "adv": "Apple",
+    "slot": "desk_home_Promo_large_carrossel_p1",
+    "pos": "2",
+    "title": "iPhone 17 em até 21x"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_07",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "desk_home_Ads_large_carrossel_p3",
+    "pos": "2",
+    "title": "Galaxy A57 R$1.599 no Pix"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_08",
+    "k": "paid",
+    "adv": "Midea",
+    "slot": "desk_home_Ads_large_carrossel_p4",
+    "pos": "2",
+    "title": "11.11 produtos com até 50% off, 10x sem juros"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_01",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "desk_hypertop_Ads_small",
+    "pos": "1",
+    "title": "Galaxy A57/A37 + Buds Core por R$49"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_03",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "Banner lateral · Publicidade",
+    "pos": "2",
+    "title": "Galaxy feito para durar"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_04",
+    "k": "paid",
+    "adv": "Electrolux",
+    "slot": "Banner lateral · Publicidade",
+    "pos": "2",
+    "title": "Esquenta Black Friday, 100 anos"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_05",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "Banner lateral · Publicidade",
+    "pos": "2",
+    "title": "Galaxy Book Go e Book4 em 10x"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_10",
+    "k": "own",
+    "adv": "Magalu",
+    "slot": "desk_home_large_carrossel_p6_10",
+    "pos": "2",
+    "title": "Ofertas antecipadas da Black Friday"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_11",
+    "k": "own",
+    "adv": "Magalu",
+    "slot": "desk_home_large_carrossel_p6_10",
+    "pos": "2",
+    "title": "Compre seu móvel e contrate a montagem"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_12",
+    "k": "own",
+    "adv": "Magalu",
+    "slot": "desk_home_large_carrossel_p6_10",
+    "pos": "2",
+    "title": "Quarta de telefonia a partir de R$799"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_13",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "desk_home_large_carrossel_p6_10",
+    "pos": "2",
+    "title": "Galaxy Book Go e Book4"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_14",
+    "k": "own",
+    "adv": "Magalu",
+    "slot": "desk_home_large_carrossel_p6_10",
+    "pos": "2",
+    "title": "Entrega rápida para você"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_15",
+    "k": "paid",
+    "adv": "Intel",
+    "slot": "desk_home_Ads_medium",
+    "pos": "3",
+    "title": "É dia de oferta 11.11"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_16",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "desk_home_Ads_trio_superior_1",
+    "pos": "4",
+    "title": "Galaxy: até 7 atualizações de Android"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_17",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "desk_home_Ads_trio_superior_2",
+    "pos": "4",
+    "title": "Até 21x de R$253,90 no cartão Magalu"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_18",
+    "k": "paid",
+    "adv": "Samsung",
+    "slot": "desk_home_Ads_trio_superior_3",
+    "pos": "4",
+    "title": "Galaxy S25 Ultra"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_19",
+    "k": "paid",
+    "adv": "Acer",
+    "slot": "desk_home_Ads_trio_meio_5",
+    "pos": "10",
+    "title": "Aspire Go 15 com Intel Core i7"
+   },
+   {
+    "m": "magalu",
+    "img": "magalu_20",
+    "k": "own",
+    "adv": "Magalu",
+    "slot": "desktop_magaluempresas",
+    "pos": "13",
+    "title": "Magalu Empresas"
+   },
+   {
+    "m": "cb",
+    "img": "cb_02",
+    "k": "paid",
+    "adv": "Midea",
+    "slot": "Ads_CB_11.11_Midea_Desk",
+    "pos": "1",
+    "title": "Black Friday Midea, 24x no carnê digital"
+   },
+   {
+    "m": "cb",
+    "img": "cb_04",
+    "k": "own",
+    "adv": "Casas Bahia",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Black de Móveis até 50% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_01",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "1 ano de Shopee grátis"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_02",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Descontão do dia: panettone com cupom"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_04",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Eletroeletrônicos até 40% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_05",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Casa e construção até 50% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_06",
+    "k": "paid",
+    "adv": "Multimóveis",
+    "slot": "Lojas Oficiais · Anúncio",
+    "pos": "1",
+    "title": "Sua casa de cara nova"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_07",
+    "k": "paid",
+    "adv": "Britânia",
+    "slot": "Banner de loja · adsTrackingPayload",
+    "pos": "1",
+    "title": "A estrela da sua cozinha"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_08",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Para o seu dia a dia até 40% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_09",
+    "k": "paid",
+    "adv": "WAP",
+    "slot": "Lojas Oficiais · Anúncio",
+    "pos": "1",
+    "title": "Até 40% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_10",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Auto e moto até 40% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_11",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Estoque na Shopee até 70% off"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_12",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Parcele em até 12x sem juros"
+   },
+   {
+    "m": "shopee",
+    "img": "shopee_13",
+    "k": "own",
+    "adv": "Shopee",
+    "slot": "Faixa de cupons",
+    "pos": "2",
+    "title": "Cupons de desconto e frete grátis"
+   },
+   {
+    "m": "midea",
+    "img": "midea_02",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "11.11: 11% off no Pix"
+   },
+   {
+    "m": "midea",
+    "img": "midea_03",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Produtos com até 60% off, 12x sem juros"
+   },
+   {
+    "m": "midea",
+    "img": "midea_04",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Cupons de até R$500"
+   },
+   {
+    "m": "midea",
+    "img": "midea_05",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Blackout: outlet com 10% off"
+   },
+   {
+    "m": "midea",
+    "img": "midea_06",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Geladeiras até 36% off"
+   },
+   {
+    "m": "midea",
+    "img": "midea_07",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Lava-louças até 29% off"
+   },
+   {
+    "m": "midea",
+    "img": "midea_08",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Eletroportáteis até 60% off"
+   },
+   {
+    "m": "midea",
+    "img": "midea_09",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Hero carrossel",
+    "pos": "1",
+    "title": "Frete grátis Sul e Sudeste"
+   },
+   {
+    "m": "midea",
+    "img": "midea_10",
+    "k": "brand",
+    "adv": "Midea",
+    "slot": "Banner de linha",
+    "pos": "2",
+    "title": "Linha Black Edition"
+   }
+  ],
+  "extras": [
+   {
+    "m": "amazon",
+    "adv": "Samsung",
+    "slot": "Sponsored Products",
+    "title": "TV Neo QLED 55\" QN70H"
+   },
+   {
+    "m": "amazon",
+    "adv": "Samsung",
+    "slot": "Sponsored Products",
+    "title": "TV Neo QLED 55\" QN70H (2º card)"
+   },
+   {
+    "m": "amazon",
+    "adv": "Midea",
+    "slot": "Sponsored Products",
+    "title": "Ar-condicionado AirVolution Lite 9.000 BTUs"
+   },
+   {
+    "m": "amazon",
+    "adv": "LG",
+    "slot": "Sponsored Products",
+    "title": "Ar-condicionado Dual Inverter AI Voice 12.000 BTUs"
+   },
+   {
+    "m": "amazon",
+    "adv": "Oster",
+    "slot": "Sponsored Products",
+    "title": "Chaleira elétrica inox 2L"
+   },
+   {
+    "m": "amazon",
+    "adv": "Gshield",
+    "slot": "Sponsored Products",
+    "title": "Filtro de linha Energy Cube"
+   },
+   {
+    "m": "amazon",
+    "adv": "Não identificado",
+    "slot": "adplacements Gateway desktop-wp-1",
+    "title": "Display Amazon Ads"
+   },
+   {
+    "m": "amazon",
+    "adv": "Não identificado",
+    "slot": "adplacements Gateway desktop-wp-2",
+    "title": "Display Amazon Ads"
+   },
+   {
+    "m": "amazon",
+    "adv": "Não identificado",
+    "slot": "adplacements desktop-wp-dynamic",
+    "title": "Display Amazon Ads"
+   },
+   {
+    "m": "amazon",
+    "adv": "Não identificado",
+    "slot": "adplacements desktop-wp-dynamic-2",
+    "title": "Display Amazon Ads"
+   },
+   {
+    "m": "magalu",
+    "adv": "Samsung",
+    "slot": "Vitrine \"Patrocinados\"",
+    "title": "Ar-condicionado WindFree AI 12.000 BTUs"
+   },
+   {
+    "m": "magalu",
+    "adv": "Electrolux",
+    "slot": "desk_home_Ads_large_carrossel_p5",
+    "title": "Seleção Electrolux nov/26"
+   },
+   {
+    "m": "cb",
+    "adv": "WAP",
+    "slot": "Ads_CB_11.11_WAP_Desk",
+    "title": "Black Friday WAP, 24x no carnê"
+   }
+  ]
+ }
+}

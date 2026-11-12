@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ page_title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a broadcast control room. Video wall of six live screens, then the ledger of who paid, then the proof. */
+:root {
+  --ink: #0a0c11;
+  --panel: #12161f;
+  --line: #242a37;
+  --text: #edf0f5;
+  --muted: #8b94a7;
+  --paid: #ffb02e;
+  --proof: #39dd8a;
+  --own: #6f9bff;
+  --display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--text); font-family: var(--body); }
+body { overflow-x: hidden; }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--paid); outline-offset: 2px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 20px; display: flex; flex-direction: column; gap: 56px; }
+
+/* top bar */
+.bar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--ink) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.bar-in { max-width: 1320px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -.02em; }
+.brand b { color: var(--paid); }
+.rec { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.rec i { width: 9px; height: 9px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 10px #ff4d4d; }
+.bar nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.bar nav a { text-decoration: none; font-size: 13px; color: var(--muted); padding: 6px 10px; border-radius: 999px; border: 1px solid transparent; }
+.bar nav a:hover { color: var(--text); border-color: var(--line); }
+
+/* hero */
+.hero { padding-top: 44px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 32px; align-items: end; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--paid); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(40px, 7vw, 92px); line-height: .92; letter-spacing: -.035em; margin: 12px 0 0; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--paid); }
+.lede { color: var(--muted); font-size: 17px; line-height: 1.5; max-width: 56ch; margin: 18px 0 0; }
+.lede strong { color: var(--text); font-weight: 600; }
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.kpi { background: var(--panel); padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+.kpi .n { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.kpi .n.paid { color: var(--paid); }
+.kpi .l { font-size: 13px; color: var(--muted); }
+
+/* logo marquee */
+.marquee { overflow: hidden; border-block: 1px solid var(--line); padding: 14px 0; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.track { display: flex; gap: 14px; width: max-content; }
+.logo-chip { height: 46px; padding: 6px 12px; border-radius: 10px; background: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+.logo-chip img { max-height: 32px; width: auto; }
+.logo-chip.dark { background: #000; }
+@media (prefers-reduced-motion: no-preference) {
+  .track { animation: scroll 38s linear infinite; }
+  .rec i { animation: blink 1.2s steps(2, start) infinite; }
+}
+@keyframes scroll { to { transform: translateX(-50%); } }
+@keyframes blink { to { visibility: hidden; } }
+
+/* sections */
+.sec-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4vw, 44px); letter-spacing: -.025em; margin: 0; line-height: 1; text-wrap: balance; }
+.sec-head p { margin: 0; color: var(--muted); max-width: 68ch; line-height: 1.5; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* video wall */
+.wall { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+.screen { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; text-align: left; padding: 0; transition: border-color .2s; }
+.screen:hover { border-color: #3a4256; }
+.screen-top { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.mk { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
+.mk-sw { width: 12px; height: 12px; border-radius: 50%; }
+.screen-top .cnt { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.stage { position: relative; aspect-ratio: 16 / 7; background: #000; overflow: hidden; }
+.slide { position: absolute; inset: 0; opacity: 0; transition: opacity .9s ease; }
+.slide.on { opacity: 1; }
+.slide .bg { position: absolute; inset: -20px; background-size: cover; background-position: center; filter: blur(22px) brightness(.55) saturate(1.3); }
+.slide img.fg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+@media (prefers-reduced-motion: no-preference) {
+  .slide.on img.fg { animation: kb 6s ease-out both; }
+}
+@keyframes kb { from { transform: scale(1.0); } to { transform: scale(1.04); } }
+.tag { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; z-index: 2; max-width: calc(100% - 20px); }
+.pill { font-family: var(--mono); font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; background: rgba(10,12,17,.82); border: 1px solid rgba(255,255,255,.14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pill.paid { background: var(--paid); color: #1a1200; border-color: var(--paid); font-weight: 600; }
+.pill.own { background: var(--own); color: #06122e; border-color: var(--own); font-weight: 600; }
+.pill.brand { background: #b48cff; color: #1a0b33; border-color: #b48cff; font-weight: 600; }
+.prog { display: flex; gap: 3px; padding: 10px 14px 12px; }
+.prog i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; position: relative; }
+.prog i.done { background: #4a5266; }
+.prog i.now::after { content: ""; position: absolute; inset: 0; background: var(--text); transform-origin: left; animation: fill var(--dur, 4.5s) linear forwards; }
+@keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.screen-foot { display: flex; gap: 14px; padding: 0 14px 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.screen-foot b { color: var(--text); font-variant-numeric: tabular-nums; }
+.cap { padding: 0 14px 4px; font-size: 14px; min-height: 2.6em; line-height: 1.3; }
+
+/* leaderboard */
+.board { display: flex; flex-direction: column; gap: 8px; }
+.row { display: grid; grid-template-columns: 34px 150px minmax(0, 1fr) 54px; gap: 14px; align-items: center; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.row .rk { font-family: var(--mono); color: var(--muted); font-size: 13px; }
+.row .lg { height: 40px; display: flex; align-items: center; }
+.row .lg .logo-chip { height: 40px; }
+.row .lg .logo-chip img { max-height: 26px; max-width: 120px; }
+.row .nm { font-family: var(--display); font-weight: 700; font-size: 18px; }
+.barbox { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.barline { height: 14px; border-radius: 4px; background: var(--paid); min-width: 4px; }
+.row.me .barline { background: var(--proof); }
+.where { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.where span { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.row .val { font-family: var(--display); font-weight: 700; font-size: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ownership bars */
+.own-grid { display: flex; flex-direction: column; gap: 12px; }
+.own-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 70px; gap: 12px; align-items: center; }
+.own-row .mk { font-size: 15px; }
+.stack { display: flex; height: 26px; border-radius: 6px; overflow: hidden; background: var(--line); }
+.stack div { height: 100%; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; font-weight: 600; color: #0a0c11; min-width: 0; }
+.own-row .tot { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; }
+
+/* proof */
+.proof-ctl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.chipbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+.chipbtn[aria-pressed="true"] { border-color: var(--proof); background: color-mix(in srgb, var(--proof) 14%, var(--panel)); }
+.proofs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+.card .shot { position: relative; aspect-ratio: 16 / 8; background: #000; overflow: hidden; }
+.card .shot .bg { position: absolute; inset: -20px; background-size: cover; background-position: center; filter: blur(18px) brightness(.5); }
+.card .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.card .shot.noimg { display: flex; align-items: center; justify-content: center; color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 16px; text-align: center; background: repeating-linear-gradient(45deg, #11151d, #11151d 10px, #141924 10px, #141924 20px); }
+.stamp { position: absolute; top: 12px; right: 12px; z-index: 2; transform: rotate(-6deg); border: 2px solid var(--proof); color: var(--proof); background: rgba(8,20,13,.85); font-family: var(--mono); font-weight: 600; font-size: 11px; letter-spacing: .08em; padding: 5px 8px; border-radius: 6px; text-transform: uppercase; }
+.card dl { margin: 0; padding: 14px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; font-size: 13px; }
+.card dt { color: var(--muted); }
+.card dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-word; }
+
+/* lightbox */
+dialog.lb { border: 0; padding: 0; background: transparent; max-width: min(1200px, 96vw); width: 96vw; color: var(--text); }
+dialog.lb::backdrop { background: rgba(4,5,8,.92); }
+.lb-in { display: flex; flex-direction: column; gap: 12px; }
+.lb-top { display: flex; align-items: center; gap: 12px; }
+.lb-top .x { margin-left: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.lb-stage { position: relative; background: #000; border-radius: 12px; overflow: hidden; height: min(68vh, 640px); }
+.lb-stage img { width: 100%; height: 100%; object-fit: contain; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(10,12,17,.8); border: 1px solid var(--line); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 20px; }
+.lb-nav.p { left: 10px; } .lb-nav.n { right: 10px; }
+.lb-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lb-thumbs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.lb-thumbs button { flex: none; width: 96px; height: 54px; border-radius: 6px; overflow: hidden; border: 2px solid transparent; padding: 0; background: #000; cursor: pointer; }
+.lb-thumbs button[aria-current="true"] { border-color: var(--paid); }
+.lb-thumbs img { width: 100%; height: 100%; object-fit: cover; }
+
+details.method { border-top: 1px solid var(--line); padding: 20px 0 40px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+details.method summary { cursor: pointer; color: var(--text); font-weight: 600; }
+details.method ul { padding-left: 18px; max-width: 80ch; }
+
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; }
+  .wall { grid-template-columns: 1fr; }
+  .row { grid-template-columns: 26px 100px minmax(0, 1fr) 40px; gap: 10px; }
+  .row .lg .logo-chip img { max-width: 80px; }
+  .own-row { grid-template-columns: 90px minmax(0, 1fr) 54px; }
+  .bar nav { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <span class="brand">Shelf<b>Proof</b></span>
+  <span class="rec"><i></i>{{ header_line }}</span>
+  <nav aria-label="Seções"><a href="#wall">Video wall</a><a href="#board">Quem pagou</a><a href="#own">Propriedade</a><a href="#proof">Prova</a></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Raio-X das home pages · {{ event_label }}</div>
+      <h1>Quem comprou a vitrine no <em>{{ event_label }}</em>?</h1>
+      <p class="lede" id="lede">Peças reais capturadas nas homes de {{ sites_text }}, classificadas espaço a espaço entre mídia paga, campanha do marketplace e loja da marca.</p>
+    </div>
+    <div class="kpis" id="kpis">
+      <div class="kpi"><span class="n" id="k-pieces">0</span><span class="l">peças publicitárias capturadas</span></div>
+      <div class="kpi"><span class="n paid" id="k-paid">0</span><span class="l">espaços pagos identificados</span></div>
+      <div class="kpi"><span class="n" id="k-adv">0</span><span class="l">anunciantes com nome</span></div>
+      <div class="kpi"><span class="n" id="k-lead">—</span><span class="l" id="k-lead-l">maior comprador de espaço</span></div>
+    </div>
+  </section>
+
+  <div class="marquee" aria-label="Logos dos anunciantes, recortados das peças capturadas"><div class="track" id="track"></div></div>
+
+  <section id="wall">
+    <div class="sec-head">
+      <div class="eyebrow">Video wall</div>
+      <h2>As seis vitrines, rodando como o cliente viu</h2>
+      <p>Cada tela repete em loop as peças salvas daquela home. A etiqueta mostra quem pagou e o código do espaço. Clique numa tela para abrir a galeria completa.</p>
+      <div class="legend"><span><i class="dot" style="background:var(--paid)"></i>Mídia paga</span><span><i class="dot" style="background:var(--own)"></i>Campanha do marketplace</span><span><i class="dot" style="background:#b48cff"></i>Loja da própria marca</span></div>
+    </div>
+    <div class="wall" id="wallGrid"></div>
+  </section>
+
+  <section id="board">
+    <div class="sec-head">
+      <div class="eyebrow">Ranking de compra de espaço</div>
+      <h2>Quem pagou para aparecer</h2>
+      <p>Posições pagas com anunciante identificado, somando banners, vitrines patrocinadas e Sponsored Products. Logos recortados das próprias peças.</p>
+    </div>
+    <div class="board" id="boardList"></div>
+  </section>
+
+  <section id="own">
+    <div class="sec-head">
+      <div class="eyebrow">Propriedade do espaço</div>
+      <h2>De quem é cada home</h2>
+      <p>Das peças capturadas em cada página, quantas são mídia vendida a marcas e quantas são campanha do próprio marketplace.</p>
+    </div>
+    <div class="own-grid" id="ownGrid"></div>
+  </section>
+
+  <section id="proof">
+    <div class="sec-head">
+      <div class="eyebrow">Proof of Placement</div>
+      <h2>A prova de que o anúncio foi ao ar</h2>
+      <p>Escolha um anunciante e veja cada espaço em que ele apareceu, com a peça, a página, o código do slot e a data da coleta.</p>
+    </div>
+    <div class="proof-ctl" id="proofCtl" role="group" aria-label="Escolha o anunciante"></div>
+    <div class="proofs" id="proofGrid"></div>
+  </section>
+
+  <details class="method">
+    <summary>Como esta leitura foi feita</summary>
+    <ul>
+      {% for line in method_notes %}<li>{{ line }}</li>
+      {% endfor %}
+      <li>Mídia paga: rótulo "Patrocinado"/"Publicidade"/"Anúncio" na peça, nome de slot de Ads (Magalu), placement de Amazon Ads, código "ADS" (Mercado Livre), "Ads_CB" (Casas Bahia) ou rastreio de anúncio (Shopee).</li>
+      <li>Espaços pagos sem imagem salva (Sponsored Products da Amazon, vitrine "Patrocinados" do Magalu, banner WAP da Casas Bahia, carrossel Electrolux do Magalu) entram no ranking e aparecem na prova como registro de código.</li>
+      <li>Peças com celebridades e pessoas reais ficaram de fora desta versão.</li>
+      <li>Esta é uma leitura de uma coleta. A versão em produção repete a coleta ao longo do dia, em desktop e mobile, e mede área e posição na dobra.</li>
+    </ul>
+  </details>
+</main>
+
+<dialog class="lb" id="lb" aria-label="Galeria da home">
+  <div class="lb-in">
+    <div class="lb-top"><span class="mk-sw" id="lbSw"></span><span class="mk" id="lbTitle"></span><span class="pill" id="lbCount"></span><button class="x" id="lbClose" type="button">Fechar</button></div>
+    <div class="lb-stage"><img id="lbImg" alt=""><button class="lb-nav p" id="lbPrev" type="button" aria-label="Peça anterior">‹</button><button class="lb-nav n" id="lbNext" type="button" aria-label="Próxima peça">›</button></div>
+    <div class="lb-meta" id="lbMeta"></div>
+    <div class="lb-thumbs" id="lbThumbs"></div>
+  </div>
+</dialog>
+
+<script>
+const DATA = {{ data_json | safe }};
+const DATE = DATA.date;
+const MKTS = DATA.mkts;
+const LOGOS = DATA.logos;
+const DARK_LOGO = new Set(DATA.dark_logos);
+// k: paid | own | brand
+const P = DATA.pieces;
+const X = DATA.extras.map((r) => Object.assign({ img: null, k: 'paid', pos: '\u2014' }, r));
+const ALL = P.concat(X);
+const PAID = ALL.filter((r) => r.k === 'paid');
+const KIND = { paid: ['paid', 'PAGO'], own: ['own', 'MARKETPLACE'], brand: ['brand', 'LOJA DA MARCA'] };
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const imgSrc = (n) => 'img/' + n + '.webp';
+function logoChip(adv) {
+  const k = LOGOS[adv];
+  if (!k) { const c = el('span', 'logo-chip dark'); c.append(el('span', 'nm', adv)); c.style.color = '#fff'; c.style.fontFamily = 'var(--display)'; c.style.fontWeight = 700; return c; }
+  const c = el('span', 'logo-chip' + (DARK_LOGO.has(k) ? ' dark' : ''));
+  const i = new Image(); i.src = 'logo/' + k + '.png'; i.alt = adv; c.append(i); return c;
+}
+
+// KPIs
+const byAdv = d3rollup(PAID.filter((r) => r.adv !== 'Não identificado'));
+function d3rollup(rows) { const m = new Map(); rows.forEach((r) => { const o = m.get(r.adv) || { adv: r.adv, n: 0, where: new Map() }; o.n++; o.where.set(r.m, (o.where.get(r.m) || 0) + 1); m.set(r.adv, o); }); return [...m.values()].sort((a, b) => b.n - a.n || a.adv.localeCompare(b.adv)); }
+const kv = { 'k-pieces': P.length, 'k-paid': PAID.length, 'k-adv': byAdv.length };
+Object.entries(kv).forEach(([id, v]) => countUp($('#' + id), v));
+$('#k-lead').textContent = byAdv[0].adv;
+$('#k-lead-l').textContent = 'maior comprador de espaço (' + byAdv[0].n + ' posições)';
+function countUp(node, v) {
+  if (reduce) { node.textContent = v; return; }
+  const t0 = performance.now(), d = 1200;
+  node.textContent = v;
+  const step = (t) => { const p = Math.min(1, (t - t0) / d); node.textContent = Math.round(v * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+// marquee
+const track = $('#track');
+const mlogos = Object.keys(LOGOS);
+[...mlogos, ...mlogos].forEach((a) => track.append(logoChip(a)));
+
+// video wall
+const screens = [];
+Object.entries(MKTS).forEach(([key, mk]) => {
+  const items = P.filter((r) => r.m === key);
+  const s = el('button', 'screen'); s.type = 'button'; s.setAttribute('aria-label', 'Abrir galeria de ' + mk.name);
+  const top = el('div', 'screen-top'); const sw = el('span', 'mk-sw'); sw.style.background = mk.color;
+  const cnt = el('span', 'cnt');
+  top.append(sw, el('span', 'mk', mk.name), cnt);
+  const stage = el('div', 'stage');
+  const slides = items.map((r) => {
+    const d = el('div', 'slide'); const bg = el('div', 'bg'); bg.style.backgroundImage = 'url(' + imgSrc(r.img) + ')';
+    const im = new Image(); im.className = 'fg'; im.src = imgSrc(r.img); im.alt = r.adv + ': ' + r.title; im.loading = 'lazy';
+    const tag = el('div', 'tag'); const [cls, lbl] = KIND[r.k];
+    tag.append(el('span', 'pill ' + cls, lbl));
+    if (r.k === 'paid') tag.append(el('span', 'pill', r.adv));
+    tag.append(el('span', 'pill', r.slot));
+    d.append(bg, im, tag); stage.append(d); return d;
+  });
+  const cap = el('div', 'cap');
+  const prog = el('div', 'prog'); const bars = items.map(() => { const i = el('i'); prog.append(i); return i; });
+  const paidN = items.filter((r) => r.k === 'paid').length;
+  const foot = el('div', 'screen-foot');
+  const f1 = el('span'); f1.append(el('b', null, String(items.length)), document.createTextNode(' peças'));
+  const f2 = el('span'); f2.append(el('b', null, String(paidN)), document.createTextNode(' pagas'));
+  foot.append(f1, f2);
+  s.append(top, stage, prog, cap, foot);
+  $('#wallGrid').append(s);
+  const st = { key, items, slides, bars, cap, cnt, i: 0 };
+  show(st, 0);
+  screens.push(st);
+  s.addEventListener('click', () => openLb(key, st.i));
+});
+function show(st, i) {
+  st.i = (i + st.items.length) % st.items.length;
+  st.slides.forEach((d, j) => d.classList.toggle('on', j === st.i));
+  st.bars.forEach((b, j) => { b.className = j < st.i ? 'done' : (j === st.i ? 'now' : ''); });
+  const r = st.items[st.i];
+  st.cap.textContent = r.title;
+  st.cnt.textContent = (st.i + 1) + '/' + st.items.length;
+}
+if (!reduce) {
+  screens.forEach((st, n) => {
+    const dur = 4200 + n * 350;
+    st.bars.forEach((b) => b.style.setProperty('--dur', dur + 'ms'));
+    setInterval(() => { if (!document.hidden) show(st, st.i + 1); }, dur);
+  });
+}
+
+// leaderboard
+const max = byAdv[0].n;
+byAdv.forEach((o, idx) => {
+  const r = el('div', 'row' + (o.adv === 'Midea' ? ' me' : ''));
+  const lg = el('div', 'lg'); lg.append(logoChip(o.adv));
+  const box = el('div', 'barbox');
+  const b = el('div', 'barline'); b.style.width = (100 * o.n / max) + '%';
+  const w = el('div', 'where');
+  [...o.where].sort((a, c) => c[1] - a[1]).forEach(([m, n]) => w.append(el('span', null, MKTS[m].name + ' × ' + n)));
+  box.append(b, w);
+  r.append(el('span', 'rk', String(idx + 1).padStart(2, '0')), lg, box, el('span', 'val', String(o.n)));
+  $('#boardList').append(r);
+});
+const unk = PAID.filter((r) => r.adv === 'Não identificado').length;
+const note = el('p', null, unk + ' espaços pagos não trazem o anunciante no código (displays da Amazon e do Mercado Livre). Na versão em produção, a IA lê a imagem e segue o clique para identificar.');
+note.style.cssText = 'color:var(--muted);font-size:13px;margin:8px 0 0';
+$('#boardList').append(note);
+
+// ownership
+Object.entries(MKTS).forEach(([key, mk]) => {
+  const items = P.filter((r) => r.m === key);
+  const c = { paid: 0, own: 0, brand: 0 }; items.forEach((r) => c[r.k]++);
+  const row = el('div', 'own-row');
+  const name = el('span', 'mk', mk.name);
+  const stack = el('div', 'stack'); stack.setAttribute('role', 'img');
+  stack.setAttribute('aria-label', mk.name + ': ' + c.paid + ' pagas, ' + c.own + ' do marketplace, ' + c.brand + ' da marca');
+  [['paid', 'var(--paid)'], ['own', 'var(--own)'], ['brand', '#b48cff']].forEach(([k, col]) => {
+    if (!c[k]) return; const d = el('div', null, String(c[k])); d.style.flex = c[k]; d.style.background = col; d.title = KIND[k][1] + ': ' + c[k]; stack.append(d);
+  });
+  row.append(name, stack, el('span', 'tot', Math.round(100 * c.paid / items.length) + '% pago'));
+  $('#ownGrid').append(row);
+});
+
+// proof of placement
+const proofAdvs = byAdv.map((o) => o.adv);
+let cur = proofAdvs.includes('Midea') ? 'Midea' : proofAdvs[0];
+proofAdvs.forEach((a) => {
+  const b = el('button', 'chipbtn'); b.type = 'button'; b.dataset.adv = a;
+  b.append(el('span', null, a), el('span', 'pill', String(byAdv.find((o) => o.adv === a).n)));
+  b.addEventListener('click', () => { cur = a; renderProof(); });
+  $('#proofCtl').append(b);
+});
+function renderProof() {
+  document.querySelectorAll('#proofCtl .chipbtn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.adv === cur)));
+  const g = $('#proofGrid'); g.replaceChildren();
+  PAID.filter((r) => r.adv === cur).forEach((r) => {
+    const c = el('article', 'card');
+    const shot = el('div', 'shot' + (r.img ? '' : ' noimg'));
+    if (r.img) { const bg = el('div', 'bg'); bg.style.backgroundImage = 'url(' + imgSrc(r.img) + ')'; const im = new Image(); im.src = imgSrc(r.img); im.alt = r.title; shot.append(bg, im); }
+    else shot.textContent = 'Registro de código: posição paga encontrada no HTML, sem imagem salva';
+    c.append(shot, el('span', 'stamp', r.img ? 'Veiculado ✓ ' + DATE : 'Detectado ✓ ' + DATE));
+    const dl = el('dl');
+    [['Página', MKTS[r.m].name], ['Slot', r.slot], ['Posição', r.pos === '—' ? 'não informada' : r.pos + 'ª faixa da home'], ['Peça', r.title], ['Coleta', DATE + ' · desktop']].forEach(([k, v]) => dl.append(el('dt', null, k), el('dd', null, v)));
+    c.append(dl); g.append(c);
+  });
+}
+renderProof();
+
+// lightbox
+const lb = $('#lb'); let lbKey = null, lbI = 0;
+function openLb(key, i) { lbKey = key; lbI = i; drawLb(); try { lb.showModal(); } catch (e) { lb.setAttribute('open', ''); } }
+function drawLb() {
+  const items = P.filter((r) => r.m === lbKey); lbI = (lbI + items.length) % items.length; const r = items[lbI];
+  $('#lbSw').style.background = MKTS[lbKey].color; $('#lbTitle').textContent = MKTS[lbKey].name;
+  $('#lbCount').textContent = (lbI + 1) + '/' + items.length;
+  $('#lbImg').src = imgSrc(r.img); $('#lbImg').alt = r.adv + ': ' + r.title;
+  const meta = $('#lbMeta'); meta.replaceChildren(); const [cls, lbl] = KIND[r.k];
+  meta.append(el('span', 'pill ' + cls, lbl), el('span', 'pill', r.adv), el('span', 'pill', r.slot), el('span', null, r.title));
+  const th = $('#lbThumbs'); th.replaceChildren();
+  items.forEach((it, j) => { const b = el('button'); b.type = 'button'; b.setAttribute('aria-current', String(j === lbI)); b.setAttribute('aria-label', it.title); const im = new Image(); im.src = imgSrc(it.img); im.alt = ''; b.append(im); b.addEventListener('click', () => { lbI = j; drawLb(); }); th.append(b); });
+}
+$('#lbPrev').addEventListener('click', () => { lbI--; drawLb(); });
+$('#lbNext').addEventListener('click', () => { lbI++; drawLb(); });
+$('#lbClose').addEventListener('click', () => lb.close());
+lb.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') { lbI--; drawLb(); } if (e.key === 'ArrowRight') { lbI++; drawLb(); } });
+lb.addEventListener('click', (e) => { if (e.target === lb) lb.close(); });
+</script>
+</body>
+</html>
