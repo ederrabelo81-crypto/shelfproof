@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 
 from shelfproof.detect.brands import find_brand
 from shelfproof.models import Piece
-from shelfproof.vision.advertiser import VisionClient, _context, accept, prepare_image
+from shelfproof.vision.advertiser import VisionClient, _context, accept, is_known_brand, prepare_image
 
 REF = Path(__file__).resolve().parents[2] / "reference" / "showroom_2026-11-11"
 MKT = {"ml": "mercadolivre", "cb": "casasbahia"}
@@ -47,6 +47,7 @@ def evaluate_reference(reader: VisionClient, ref_dir: Path = REF, limit: int = 0
         else:
             outcome = "certo" if _same(got, truth) else "errado"
         rows.append({"img": r["img"], "truth": truth, "got": got, "outcome": outcome,
+                     "needs_review": bool(got) and not is_known_brand(got),
                      "confidence": reading.confidence if reading else None,
                      "text_seen": reading.text_seen if reading else None,
                      "people_present": reading.people_present if reading else None})

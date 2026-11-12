@@ -77,7 +77,7 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
 
         st = resolve_unknown_advertisers(pieces, run_dir, reader)
         logger.info(f"visao: {st['resolved']}/{st['candidates']} anunciantes lidos na imagem "
-                    f"({st['api_calls']} chamadas, {st['cached']} do cache, {st['no_image']} sem imagem, "
+                    f"({st['needs_review']} para conferir, {st['api_calls']} chamadas, {st['cached']} do cache, {st['no_image']} sem imagem, "
                     f"{st['errors']} erros)")
 
     (run_dir / "pieces.json").write_text(
@@ -109,5 +109,6 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         "paid_area_by_advertiser": {k: round(v) for k, v in sorted(area_by_adv.items(), key=lambda kv: -kv[1])},
         "paid_unidentified": paid_by_adv.get(UNKNOWN_ADVERTISER, 0),
         "paid_identified_by_vision": sum(1 for p in pieces if p.is_paid and p.extra.get("advertiser_source") == "vision"),
+        "paid_needs_review": [p.advertiser for p in pieces if p.is_paid and p.extra.get("needs_review")],
         "first_fold_paid": sum(1 for p in pieces if p.is_paid and p.bbox and p.bbox.fold == 1),
     }

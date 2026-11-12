@@ -7,7 +7,7 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 | 0 · Protótipo | Leitura de HTML salvo + Showroom manual do 11.11 | Showroom aprovado | ✅ 12/11 |
 | 1 · Esqueleto | Projeto, detector com regressão nas 6 homes, robô, pipeline, template | `pytest` verde (19), e2e local | ✅ 12/11 |
 | 2 · Campo | Rodar `capture` nas 6 homes reais, desktop + mobile, sem login | 6×2 capturas com `ok=true`; regras ajustadas para o HTML **renderizado** e para o **mobile** | ⬜ até 18/11 |
-| 3 · Visão | Anunciante pela imagem quando o HTML não diz (displays Amazon/ML, Sponsored Brands) | ≥ 80% dos `Nao identificado` resolvidos, com a evidência "lido na imagem", e **nenhuma marca errada** (`vision-eval`) | 🟨 código pronto 12/11; falta medir com a API |
+| 3 · Visão | Anunciante pela imagem quando o HTML não diz (displays Amazon/ML, Sponsored Brands) | ≥ 80% dos `Nao identificado` resolvidos, com a evidência "lido na imagem", e **nenhuma marca errada** (`vision-eval`) | ✅ 12/11: 17/19 certas, 0 erradas (89,5%) |
 | 4 · Evento | `event` agendado a cada 2 h no dia; rotação e tempo no ar ao longo do dia | Showroom da BF com desktop × mobile e tempo no ar | ⬜ 27/11 |
 | 5 · Prova | Recorte do slot no print + PDF de evidência por anunciante | PDF de uma marca pronto para enviar | ⬜ dez/26 |
 | 6 · Jornada | Home → categoria → busca → produto; funil de exposição | 1 jornada roteirizada por site | ⬜ dez/26 |
@@ -16,7 +16,7 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 ## Fase 2 — tarefas iniciais (para a primeira sessão no Claude Code)
 
 1. `pip install -r requirements.txt`, `playwright install chromium`, copiar `.env.example` para `.env`.
-2. `pytest -q` (deve dar 32 passados no PC, inclusive o e2e).
+2. `pytest -q` (deve dar 33 passados no PC, inclusive o e2e).
 3. `scripts\coleta_evento.bat` **não** ainda: começar por uma URL:
    `python -m shelfproof capture https://www.magazineluiza.com.br/ --device both`.
 4. Conferir `runs/<data>/<captura>/full.jpg` e `pieces.json`. Se o número de pagos
@@ -37,6 +37,12 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 - Ligar: `python -m shelfproof analyze --vision <captura>` (também em `capture` e `event`).
 - Medir: `python -m shelfproof vision-eval` esconde o anunciante das peças pagas do 11.11
   conferidas à mão e compara. Critério: ≥ 80% certas e 0 erradas.
+- Resultado do `vision-eval` em 12/11 (Opus 5.5): 17 certas, 0 erradas, 2 abstenções corretas
+  (`amazon_05` é uma imagem em branco na referência; `magalu_17` só mostra "cartão Magalu" —
+  na coleta real o HTML já dá Samsung e ela nem vai para a visão).
+- Marca lida fora do dicionário de `brands.py` (ex.: `ml_06` respondeu "Grand Theft Auto
+  (Rockstar Games)") entra com `needs_review` e aparece em `summary.json` → `paid_needs_review`:
+  conferir e, se for o caso, incluir a marca no dicionário.
 - `people_present=sim` em `Piece.extra` ajuda a folha de contato; a decisão continua humana (regra 8).
 
 ## Riscos

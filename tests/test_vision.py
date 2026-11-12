@@ -117,6 +117,16 @@ def test_regra_de_aceite(reading, mkt, expected):
     assert accept(reading, mkt) == expected
 
 
+def test_marca_fora_do_dicionario_vai_para_conferencia(run_dir):
+    # caso real do 11.11 (ml_06): o modelo respondeu o nome do jogo em vez de uma empresa do dicionario
+    pieces = [_paid(0, mkt="mercadolivre"), _paid(1, mkt="mercadolivre")]
+    reader = FakeReader([R("Grand Theft Auto (Rockstar Games)", conf="media"), R("Samsung")])
+    st = resolve_unknown_advertisers(pieces, run_dir, reader)
+    assert st["resolved"] == 2 and st["needs_review"] == 1
+    assert "needs_review" in pieces[0].extra and "needs_review" not in pieces[1].extra
+    assert summarize(pieces)["paid_needs_review"] == ["Grand Theft Auto (Rockstar Games)"]
+
+
 def test_eval_de_referencia_conta_certo_errado_e_abstencao():
     data = json.loads((REF / "data.json").read_text(encoding="utf-8"))["data"]
     paid = [p for p in data["pieces"] if p["k"] == "paid" and p.get("img")][:3]

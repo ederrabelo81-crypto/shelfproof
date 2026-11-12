@@ -23,7 +23,11 @@ def _has_browser() -> bool:
         import playwright  # noqa: F401
     except ImportError:
         return False
-    return bool(shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium"))
+    from shelfproof.browser.local_browser import find_chrome_exe
+
+    # no Windows o Chrome nao fica no PATH: find_chrome_exe olha os caminhos de instalacao
+    return bool(shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+                or find_chrome_exe())
 
 
 pytestmark = pytest.mark.skipif(not _has_browser(), reason="sem Playwright/Chrome nesta maquina")
