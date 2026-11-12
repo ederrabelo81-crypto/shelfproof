@@ -200,6 +200,9 @@ class _ImageSink:
     def on_response(self, response: Any) -> None:
         try:
             ctype = (response.headers or {}).get("content-type", "")
+            # redirect (3xx) nao tem corpo: o destino chega como outra resposta (pixel de rastreio da Magalu)
+            if 300 <= int(getattr(response, "status", 200) or 200) < 400:
+                return
             if _is_candidate(ctype) and response.request.resource_type in ("image", "other", "fetch"):
                 self.pending.append(response)
         except Exception as exc:

@@ -36,6 +36,13 @@ BRANDS: List[Tuple[str, List[str]]] = [
     ("Lenovo", [r"lenovo"]),
     ("Dell", [r"\bdell\b"]),
     ("Motorola", [r"motorola", r"\bmoto\s?g"]),
+    # vistos na Magalu em 12/11/2026 (vitrine Patrocinados) e comuns em celular/informatica.
+    # Fora de proposito: HP (cavalo-vapor em motor/bomba) e Positivo (palavra comum).
+    ("OPPO", [r"\boppo\b"]),
+    ("Realme", [r"\brealme\b"]),
+    ("Multilaser", [r"multilaser"]),
+    ("JBL", [r"\bjbl\b"]),
+    ("Asus", [r"\basus\b"]),
     ("Xiaomi", [r"xiaomi", r"redmi"]),
     ("Sony", [r"\bsony\b", r"playstation", r"\bps5\b"]),
     ("Neutrogena", [r"neutrogena"]),
