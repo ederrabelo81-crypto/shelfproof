@@ -57,17 +57,24 @@ def add_round(sdir: Path, started: datetime, runs: List[Dict[str, Any]], event: 
 
 
 def day_run_dirs(sdir: Path, devices: Optional[List[str]] = None) -> List[Path]:
-    """Capturas uteis de todas as rodadas do dia (ok e ja analisadas)."""
+    """Capturas uteis de todas as rodadas do dia: nao bloqueadas e com pieces.json.
+
+    Vale o que esta no disco, nao o ``ok`` da hora da rodada: uma captura cuja analise falhou
+    (ex.: faltou o lxml no PC, 17/11/2026) entra depois de ``shelfproof analyze <pasta>``.
+    """
     out: List[Path] = []
     for r in load_rounds(sdir):
         for row in r.get("runs", []):
-            if not row.get("ok") or (devices and row.get("device") not in devices):
+            if row.get("blocked") or not row.get("run_dir") or (devices and row.get("device") not in devices):
                 continue
             rd = Path(row["run_dir"])
             if (rd / "pieces.json").exists() and (rd / "manifest.json").exists():
                 out.append(rd)
-            else:
+            elif row.get("ok"):
                 logger.warning(f"rodada {r['round']}: {rd} sem pieces.json (pasta apagada?)")
+            elif (rd / "page.html").exists():
+                logger.warning(f"rodada {r['round']}: {rd} capturada mas nao analisada: "
+                               f"python -m shelfproof analyze {rd}")
     return out
 
 

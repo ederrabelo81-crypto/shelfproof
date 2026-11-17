@@ -110,6 +110,20 @@ def test_rodadas_do_dia_somam_e_refazem_o_showroom(tmp_path):
     assert build_day(tmp_path / "showroom" / "2026-11-18") is None
 
 
+def test_captura_analisada_depois_entra_no_dia(tmp_path):
+    rd = _day(tmp_path)[2]
+    pieces = (rd / "pieces.json").read_bytes()
+    (rd / "pieces.json").unlink()
+    (rd / "page.html").write_text("<html></html>", encoding="utf-8")
+    sdir = tmp_path / "showroom" / "2026-11-17"
+    add_round(sdir, datetime(2026, 11, 17, 9, tzinfo=BRT), [
+        {"site": "Mercado Livre", "device": "mobile", "ok": False, "error": "analise: lxml", "run_dir": str(rd)},
+        {"site": "Magalu", "device": "mobile", "ok": False, "blocked": True, "run_dir": str(rd)}])
+    assert day_run_dirs(sdir) == []  # ainda sem analise
+    (rd / "pieces.json").write_bytes(pieces)  # = python -m shelfproof analyze <rd>
+    assert day_run_dirs(sdir) == [rd]  # a bloqueada continua de fora
+
+
 def test_parse_date():
     assert parse_date("27/11/2026").isoformat() == "2026-11-27"
     assert parse_date("2026-11-27").isoformat() == "2026-11-27"

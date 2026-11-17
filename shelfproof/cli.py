@@ -110,6 +110,11 @@ def _cmd_event(a: argparse.Namespace) -> int:
         logger.add(f"logs/coleta_{day.isoformat()}.log", level="INFO", encoding="utf-8")
     except Exception as exc:
         logger.warning(f"log em arquivo indisponivel: {exc}")
+    missing = _missing_deps()
+    if missing:  # antes de abrir o Chrome: sem eles a rodada captura e nao classifica nada
+        logger.error(f"Faltam pacotes no Python deste PC: {', '.join(missing)}. "
+                     f"Rode: {sys.executable} -m pip install -r requirements.txt")
+        return 3
     targets = json.loads(Path(a.targets).read_text(encoding="utf-8"))["targets"]
     only = {s.strip().lower() for s in (a.only or "").split(",") if s.strip()}
     if only:
@@ -161,6 +166,13 @@ def _cmd_today(a: argparse.Namespace) -> int:
 
     print(now_brt().date().isoformat())
     return 0
+
+
+def _missing_deps() -> List[str]:
+    """Pacotes que a analise precisa (o detector usa o parser lxml do BeautifulSoup)."""
+    import importlib.util
+
+    return [m for m in ("lxml", "bs4", "PIL", "jinja2") if importlib.util.find_spec(m) is None]
 
 
 def _devices(v: str) -> List[str]:
