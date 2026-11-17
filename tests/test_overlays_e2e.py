@@ -157,3 +157,24 @@ def test_rolagem_por_script_quando_a_roda_nao_mexe_a_pagina():
     finally:
         browser.close()
         playwright_runtime.release()
+
+
+@pytest.mark.skipif(not _has_browser(), reason="sem Playwright/Chrome nesta maquina")
+def test_nao_clica_de_novo_o_que_ja_fechou():
+    # Shopee celular 17/11/2026: "Portugues (BR)" clicado 4 vezes na mesma captura
+    from shelfproof.browser import playwright_runtime
+    from shelfproof.collect.capture import dismiss_overlays
+
+    pw, _ = playwright_runtime.acquire()
+    browser = pw.chromium.launch(headless=True, channel="chrome")
+    try:
+        page = browser.new_page()
+        page.set_content('<p>Selecione seu idioma</p><button onclick="document.body.dataset.n=(+document.body.dataset.n||0)+1">'
+                         'Português (BR)</button>')
+        first = dismiss_overlays(page)
+        assert first == ["Português (BR)"]  # a janela "nao fecha", mas so um clique por chamada
+        assert dismiss_overlays(page, skip=first) == []
+        assert page.evaluate("document.body.dataset.n") == "1"
+    finally:
+        browser.close()
+        playwright_runtime.release()

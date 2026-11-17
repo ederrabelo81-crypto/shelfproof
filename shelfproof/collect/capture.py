@@ -31,7 +31,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 from loguru import logger
@@ -627,22 +627,28 @@ def _click_language_option(page: Any, pat: Any) -> str:
     return name
 
 
-def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
+def dismiss_overlays(page: Any, passes: int = 2, skip: Iterable[str] = ()) -> List[str]:
     """Fecha janelas que cobrem a vitrine (idioma, cookies, pesquisa). Devolve o que foi clicado.
 
     Botoes sao procurados tambem dentro de iframes: a pesquisa da Magalu no celular (QuestionPro)
     e um iframe por cima da home, e o "Agora nao" nao aparece para a pagina principal.
     """
     clicked: List[str] = []
+    # o que ja foi clicado nesta captura nao e clicado de novo (Shopee celular 17/11/2026:
+    # "Portugues (BR)" 4 vezes, porque o titulo "Selecione seu idioma" continuava na pagina)
+    done = {str(x).strip().lower() for x in skip}
     for _ in range(passes):
         hit = False
         targets = [("button", p) for p in OVERLAY_BUTTONS] + [("text", p) for p in OVERLAY_TEXTS]
         for kind, pat in targets:
             try:
+                if any(pat.match(d) for d in done):
+                    continue
                 if kind == "text":
                     name = _click_language_option(page, pat)
                     if name:
                         clicked.append(name)
+                        done.add(name.strip().lower())
                         hit = True
                         time.sleep(random.uniform(0.6, 1.2))
                     continue
@@ -651,17 +657,18 @@ def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
                     if j > 0 and loc.count() == 0:
                         # dentro da janela o "botao" pode ser um div clicavel: texto EXATO, so no iframe
                         loc = fr.get_by_text(pat)
-                    done = False
+                    found = False
                     for i in range(min(loc.count(), 3)):
                         b = loc.nth(i)
                         if b.is_visible():
                             name = (b.inner_text(timeout=1000) or "").strip()
                             b.click(timeout=2000)
                             clicked.append(name)
-                            hit = done = True
+                            done.add(name.strip().lower())
+                            hit = found = True
                             time.sleep(random.uniform(0.6, 1.2))
                             break
-                    if done:
+                    if found:
                         break
             except Exception:
                 continue  # botao sumiu entre a contagem e o clique: segue
@@ -896,7 +903,8 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         # 2) rolar ate o fim para carregar o lazy-load. Antes, fechar de novo: janela que carrega
         # por ultimo (pesquisa da Magalu, lazyOnload) aparece depois da 1a tentativa.
         try:
-            manifest["dismissed"] = manifest.get("dismissed", []) + dismiss_overlays(page)
+            prev = manifest.get("dismissed", [])
+            manifest["dismissed"] = prev + dismiss_overlays(page, skip=prev)
         except Exception as exc:
             errors.append(f"overlays: {exc}")
         try:
