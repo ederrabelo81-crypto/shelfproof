@@ -136,35 +136,53 @@ def _cmd_event(a: argparse.Namespace) -> int:
     reader = _reader(a)
     started = now_brt()
     done: List[dict] = []
+
+    def run_one(t: dict, dev: str, retry: bool = False) -> dict:
+        session = t.get("session", "anon")
+        try:
+            res = capture(CaptureConfig(url=t["url"], device=dev, session=session, out_root=Path(a.out),
+                                        carousel_seconds=a.carousel,
+                                        mobile_emulation=t.get("mobile_emulation", "")))
+        except Exception as exc:  # um site nao derruba a rodada
+            logger.error(f"{t['url']} ({dev}): {exc}")
+            return {"site": t["name"], "device": dev, "ok": False, "error": str(exc), "retry": retry}
+        row = {"site": t["name"], "device": dev, "session": session, "ok": bool(res.ok),
+               "blocked": bool(res.blocked), "run_dir": str(res.run_dir), "retry": retry}
+        if res.ok:
+            try:
+                ps = analyze(res.run_dir, reader=reader)
+                row.update(pieces=len(ps), paid=sum(1 for p in ps if p.is_paid))
+            except Exception as exc:
+                row.update(ok=False, error=f"analise: {exc}")
+                logger.error(f"{t['url']} ({dev}) analise: {exc}")
+        else:
+            row["error"] = "; ".join(res.errors[-2:])
+        return row
+
     for t in targets:
         for dev in t.get("devices", ["desktop", "mobile"]):
-            if dev not in _devices(a.devices):
-                continue
-            session = t.get("session", "anon")
-            try:
-                res = capture(CaptureConfig(url=t["url"], device=dev, session=session, out_root=Path(a.out),
-                                            carousel_seconds=a.carousel,
-                                            mobile_emulation=t.get("mobile_emulation", "")))
-            except Exception as exc:  # um site nao derruba a rodada
-                logger.error(f"{t['url']} ({dev}): {exc}")
-                done.append({"site": t["name"], "device": dev, "ok": False, "error": str(exc)})
-                continue
-            row = {"site": t["name"], "device": dev, "session": session, "ok": bool(res.ok),
-                   "blocked": bool(res.blocked), "run_dir": str(res.run_dir)}
-            if res.ok:
-                try:
-                    ps = analyze(res.run_dir, reader=reader)
-                    row.update(pieces=len(ps), paid=sum(1 for p in ps if p.is_paid))
-                except Exception as exc:
-                    row.update(ok=False, error=f"analise: {exc}")
-                    logger.error(f"{t['url']} ({dev}) analise: {exc}")
-            else:
-                row["error"] = "; ".join(res.errors[-2:])
-            done.append(row)
+            if dev in _devices(a.devices):
+                done.append(run_one(t, dev))
+    # Bloqueio (captcha) volta UMA vez no fim da rodada, depois de uma pausa, como um cliente que
+    # tenta mais tarde (Shopee desktop 17/11/2026: 2 captchas em 3 rodadas, ok quando rodou sozinha).
+    # Nada e resolvido: o bloqueio continua registrado na rodada; a nova tentativa entra ao lado.
+    blocked = [(t, r["device"]) for r in list(done) if r.get("blocked")
+               for t in targets if t["name"] == r["site"]]
+    if blocked and a.retry_blocked:
+        import random
+        import time as _time
+
+        pause = random.uniform(60, 120)
+        logger.info(f"{len(blocked)} captura(s) bloqueada(s): nova tentativa em {pause:.0f}s")
+        _time.sleep(pause)
+        for t, dev in blocked:
+            done.append(run_one(t, dev, retry=True))
     rnd = add_round(sdir, started, done, a.event)
     print(f"Rodada {rnd} de {day.strftime('%d/%m/%Y')}:")
     for r in done:
         st = "OK" if r["ok"] else ("BLOQUEADO" if r.get("blocked") else "FALHOU")
+        if r.get("retry"):
+            st += "*"
         extra = f"{r.get('pieces', 0)} pecas, {r.get('paid', 0)} pagas" if r["ok"] else r.get("error", "")
         print(f"  {st:9} {r['site']:14} {r['device']:7} {extra}")
     out = build_day(sdir, a.event, devices=_devices(a.showroom_device))
@@ -172,7 +190,11 @@ def _cmd_event(a: argparse.Namespace) -> int:
         logger.error("Nenhuma captura util no dia: nada para montar")
         return 2
     print(out)
-    return 0 if all(r["ok"] for r in done) else 1
+    if any(r.get("retry") for r in done):
+        print("  (* = nova tentativa no fim da rodada, depois de um bloqueio)")
+    # vale o resultado final de cada site/dispositivo: bloqueio que passou na nova tentativa nao e falha
+    final = {(r["site"], r["device"]): r["ok"] for r in done}
+    return 0 if all(final.values()) else 1
 
 
 def _cmd_today(a: argparse.Namespace) -> int:
@@ -265,6 +287,8 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--only", default="", help="so estes alvos, pelo nome: \"Magalu,Casas Bahia\"")
     c.add_argument("--showroom-device", choices=["desktop", "mobile", "both"], default="both")
     c.add_argument("--carousel", type=float, default=24.0, help="segundos observando a 1a tela")
+    c.add_argument("--no-retry-blocked", dest="retry_blocked", action="store_false",
+                   help="nao tenta de novo, no fim da rodada, o que deu bloqueio")
     c.add_argument("--list", action="store_true", help="nao captura: lista as capturas do dia (para exclude_runs)")
     c.add_argument("--rebuild", action="store_true",
                    help="nao captura: so refaz o Showroom do dia (ex.: depois do review.json)")

@@ -244,3 +244,42 @@ def test_exclude_runs_tira_captura_de_teste_do_dia(tmp_path):
     build_day(sdir)
     data = json.loads((sdir / "data.json").read_text(encoding="utf-8"))["data"]
     assert data["rounds"] == {"ml": {"desktop": 1}}
+
+
+def test_bloqueio_tenta_de_novo_uma_vez_no_fim_da_rodada(tmp_path, monkeypatch):
+    import time as _time
+
+    from shelfproof import cli
+    from shelfproof.collect import capture as cap
+    from shelfproof import pipeline
+
+    calls = []
+
+    class Res:
+        def __init__(self, rd, ok, blocked):
+            self.run_dir, self.ok, self.blocked, self.errors = rd, ok, blocked, ["BLOQUEIO: captcha"] if blocked else []
+
+    def fake_capture(cfg):
+        calls.append((cfg.url, cfg.device))
+        n = len(calls)
+        blocked = cfg.url.startswith("https://shopee") and cfg.device == "desktop" and \
+            sum(1 for c in calls if c == (cfg.url, "desktop")) == 1
+        return Res(_run(tmp_path, f"r{n}", cfg.device, 9, [_piece("S", f"x{n}")]), not blocked, blocked)
+
+    monkeypatch.setattr(cap, "capture", fake_capture)
+    monkeypatch.setattr(pipeline, "analyze", lambda rd, reader=None: [])
+    monkeypatch.setattr(_time, "sleep", lambda s: None)
+    targets = tmp_path / "t.json"
+    targets.write_text(json.dumps({"targets": [{"name": "Shopee", "url": "https://shopee.com.br/",
+                                                "devices": ["desktop", "mobile"]}]}), encoding="utf-8")
+    rc = cli.main(["event", "--targets", str(targets), "--out", str(tmp_path / "out"), "--date", "17/11/2026"])
+    assert calls == [("https://shopee.com.br/", "desktop"), ("https://shopee.com.br/", "mobile"),
+                     ("https://shopee.com.br/", "desktop")]
+    assert rc == 0  # o bloqueio passou na nova tentativa
+    rows = load_rounds(tmp_path / "out" / "showroom" / "2026-11-17")[0]["runs"]
+    assert [(r["device"], r["blocked"], r["retry"]) for r in rows] == \
+        [("desktop", True, False), ("mobile", False, False), ("desktop", False, True)]
+    calls.clear()
+    cli.main(["event", "--targets", str(targets), "--out", str(tmp_path / "out2"), "--date", "17/11/2026",
+              "--no-retry-blocked"])
+    assert len(calls) == 2

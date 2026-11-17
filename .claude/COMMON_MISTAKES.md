@@ -189,3 +189,9 @@ aparece em slug, `(?<![a-z0-9])tcl(?![a-z0-9])`.
 **Errado:** exigir `shopee.com.br/m/` no `href`: a Shopee passou a usar links relativos (`/m/...`,
 `/shop/<id>`) e a home inteira deu **0 peças**, sem erro nenhum. **Certo:** resolver o link contra o
 domínio do site (`urljoin`) antes de casar, e desconfiar de "OK, 0 peças" num site que tinha peças.
+
+### S24. Captcha da Shopee desktop no meio da rodada (17/11/2026)
+**Visto:** 2 captchas em 3 rodadas na Shopee desktop (sessão anônima limpa), sempre com outros sites
+antes; sozinha, abriu normal. **Certo:** nunca resolver captcha (regra 13). O `event` tenta **uma vez**
+de novo, no fim da rodada e depois de 60–120 s, o que deu bloqueio; o bloqueio fica registrado
+(`rounds.json`, `retry`). Se continuar, decidir com o dono se a Shopee entra no `anon_warm`.
