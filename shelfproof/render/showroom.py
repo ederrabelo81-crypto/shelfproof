@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -34,7 +35,8 @@ LOGO_DIR_DEFAULT = Path(__file__).resolve().parents[2] / "assets" / "logos"
 DARK_LOGOS_DEFAULT = {"samsung", "intel", "acer", "apple", "neutrogena"}
 
 
-def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[str], excluded: int = 0) -> List[str]:
+def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[str], excluded: int = 0,
+                 n_rounds: int = 1, window: str = "") -> List[str]:
     """Como a leitura foi feita, dito com as condicoes REAIS de cada coleta (manifest.session)."""
     clean = [s for s, v in sessions.items() if v == "anon"]
     warm = [s for s, v in sessions.items() if v == "anon_warm"]
@@ -54,7 +56,11 @@ def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[st
         notes.append(f"Sem peça com imagem nesta coleta: {', '.join(empty_sites)}.")
     if excluded:
         notes.append(f"{excluded} peça(s) com pessoa real ficaram sem imagem nesta versão (o espaço pago continua no ranking).")
-    notes.append("É a leitura de uma coleta, num instante: a vitrine gira ao longo do dia.")
+    if n_rounds > 1:
+        notes.append(f"{n_rounds} rodadas de coleta ({window}). \"No ar\" é em quantas rodadas a peça apareceu "
+                     "naquela home: é amostragem, não contagem de impressões.")
+    else:
+        notes.append("É a leitura de uma coleta, num instante: a vitrine gira ao longo do dia.")
     return notes
 
 
@@ -69,10 +75,40 @@ def render(context: Dict[str, Any], data: Dict[str, Any], out_dir: Path) -> Path
     return out_dir / "index.html"
 
 
+def _creative_key(p: Dict[str, Any], base: str) -> str:
+    """O mesmo criativo no mesmo slot, de uma rodada para outra (a posicao pode mudar)."""
+    from shelfproof.pipeline import _path_key, _src_key
+
+    ref = _src_key(p.get("img_src") or "") or _path_key(p.get("href") or "", base) or (p.get("title") or p.get("alt") or "")
+    return f"{p.get('ownership')}|{p.get('slot') or ''}|{ref}"
+
+
+def _hhmm(iso: str) -> str:
+    try:
+        return datetime.fromisoformat(iso).strftime("%H:%M")
+    except Exception:
+        return ""
+
+
+def _air(s: str) -> tuple:
+    try:
+        a, b = s.split("/")
+        return int(a), int(b)
+    except Exception:
+        return 0, 0
+
+
 def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, date_label: str,
                     logo_dir: Optional[Path] = None, review: Optional[Dict[str, List[str]]] = None,
                     max_per_site: int = 18) -> Path:
-    """Monta dados + imagens a partir de runs ja analisadas (pieces.json) e renderiza."""
+    """Monta dados + imagens a partir de runs ja analisadas (pieces.json) e renderiza.
+
+    Varias capturas do mesmo site e dispositivo (rodadas do dia) viram UMA tela: a peca vista em
+    varias rodadas entra uma vez, com ``seen``/``of`` (rodadas em que apareceu / rodadas do site)
+    e a janela ``t0``-``t1``. Nomes das imagens (os do review.json): ``<site>_<nn>`` no desktop e
+    ``<site>_m_<nn>`` no celular, na ordem em que a peca apareceu (rodada, depois de cima para baixo),
+    entao uma rodada nova nao renumera as pecas ja revisadas.
+    """
     from PIL import Image
 
     logo_dir = logo_dir or LOGO_DIR_DEFAULT
@@ -81,35 +117,80 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
     (out_dir / "img").mkdir(parents=True, exist_ok=True)
     (out_dir / "logo").mkdir(parents=True, exist_ok=True)
 
+    # agrupa as capturas por (site, dispositivo), em ordem de horario
+    groups: Dict[tuple, List[Dict[str, Any]]] = {}
+    for rd in run_dirs:
+        rd = Path(rd)
+        manifest = json.loads((rd / "manifest.json").read_text(encoding="utf-8"))
+        style = MKT_STYLE.get(manifest.get("marketplace", "generic"), MKT_STYLE["generic"])
+        dev = manifest.get("device", "desktop")
+        groups.setdefault((style["key"], dev), []).append({"rd": rd, "manifest": manifest, "style": style})
+    for runs in groups.values():
+        runs.sort(key=lambda r: r["manifest"].get("collected_at", ""))
+    devices = sorted({dev for _k, dev in groups}, key=lambda d: d != "desktop")
+    multi_dev = len(devices) > 1
+
     sessions: Dict[str, str] = {}
     mkts: Dict[str, Dict[str, str]] = {}
     pieces: List[Dict[str, Any]] = []
     extras: List[Dict[str, Any]] = []
-    devices, sites = set(), []
-    for rd in run_dirs:
-        rd = Path(rd)
-        manifest = json.loads((rd / "manifest.json").read_text(encoding="utf-8"))
-        devices.add(manifest.get("device", "desktop"))
-        raw = json.loads((rd / "pieces.json").read_text(encoding="utf-8"))
-        style = MKT_STYLE.get(manifest.get("marketplace", "generic"), MKT_STYLE["generic"])
-        key = style["key"]
-        sessions[style["name"]] = manifest.get("session", "anon")
+    sites: List[str] = []
+    rounds_by: Dict[str, Dict[str, int]] = {}
+    times: List[str] = []
+    order = sorted(groups, key=lambda kd: (min(r["manifest"].get("collected_at", "") for r in groups[kd]),
+                                           kd[1] != "desktop"))
+    for key, dev in order:
+        runs = groups[(key, dev)]
+        style = runs[0]["style"]
         if key not in mkts:
             mkts[key] = {"name": style["name"], "color": style["color"]}
             sites.append(style["name"])
-        n = sum(1 for p in pieces if p["m"] == key)
-        # ordem de leitura: de cima para baixo na pagina
-        raw.sort(key=lambda p: ((p.get("bbox") or {}).get("y", 1e9), p.get("position") or 99))
-        for p in raw:
+        rounds_by.setdefault(key, {})[dev] = len(runs)
+        for r in runs:
+            sessions[style["name"] + (f" ({'celular' if dev == 'mobile' else 'desktop'})" if multi_dev else "")] = \
+                r["manifest"].get("session", "anon")
+            times.append(r["manifest"].get("collected_at", ""))
+
+        # cada criativo, uma vez, com as rodadas em que apareceu
+        agg: Dict[str, Dict[str, Any]] = {}
+        for ri, r in enumerate(runs):
+            raw = json.loads((r["rd"] / "pieces.json").read_text(encoding="utf-8"))
+            raw.sort(key=lambda p: ((p.get("bbox") or {}).get("y", 1e9), p.get("position") or 99))
+            base = r["manifest"].get("final_url") or r["manifest"].get("url", "")
+            occ: Dict[str, int] = {}
+            for p in raw:
+                ck = _creative_key(p, base)
+                occ[ck] = occ.get(ck, 0) + 1  # mesmo criativo duas vezes na MESMA captura = duas posicoes (S4)
+                ck = f"{ck}#{occ[ck]}"
+                a = agg.get(ck)
+                if a is None:
+                    a = agg[ck] = {"p": p, "rd": r["rd"], "first": ri, "y": (p.get("bbox") or {}).get("y", 1e9),
+                                   "seen": [], "hits": 0, "frames": 0}
+                a["seen"].append(r["manifest"].get("collected_at", ""))
+                h, f = _air((p.get("extra") or {}).get("airtime_first_screen", ""))
+                a["hits"] += h
+                a["frames"] += f
+                if not (a["p"].get("extra") or {}).get("image_file") and (p.get("extra") or {}).get("image_file"):
+                    a["p"], a["rd"] = p, r["rd"]  # fica com a rodada que tem a imagem
+        items = sorted(agg.values(), key=lambda a: (a["first"], a["y"], a["p"].get("position") or 99))
+
+        prefix = f"{key}_m_" if dev == "mobile" else f"{key}_"
+        n = 0
+        for a in items:
+            p, rd = a["p"], a["rd"]
             img_file = (p.get("extra") or {}).get("image_file")
-            row = {"m": key, "k": KIND.get(p["ownership"], "own"), "adv": p["advertiser"],
+            row = {"m": key, "d": dev, "k": KIND.get(p["ownership"], "own"), "adv": p["advertiser"],
                    "slot": p.get("slot") or "", "pos": str(p.get("position") or "—"),
-                   "title": p.get("title") or p.get("alt") or ""}
+                   "title": p.get("title") or p.get("alt") or "",
+                   "seen": len(a["seen"]), "of": len(runs),
+                   "t0": _hhmm(min(a["seen"])), "t1": _hhmm(max(a["seen"]))}
+            if a["frames"]:
+                row["air"] = f"{a['hits']}/{a['frames']}"
             if img_file and n < max_per_site:
-                name = f"{key}_{n + 1:02d}"
+                name = f"{prefix}{n + 1:02d}"
                 if name in excluded:
                     if p["ownership"] == "paid":
-                        extras.append({k: row[k] for k in ("m", "adv", "slot", "title")})
+                        extras.append({k: v for k, v in row.items() if k not in ("k", "pos")})
                     n += 1
                     continue
                 try:
@@ -126,7 +207,7 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
                 except Exception:
                     pass
             if p["ownership"] == "paid":
-                extras.append({k: row[k] for k in ("m", "adv", "slot", "title")})
+                extras.append({k: v for k, v in row.items() if k not in ("k", "pos")})
 
     advs = {p["adv"] for p in pieces} | {x["adv"] for x in extras}
     logos: Dict[str, str] = {}
@@ -136,15 +217,22 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
         if src.exists():
             shutil.copy(src, out_dir / "logo" / src.name)
             logos[adv] = slug
+    n_rounds = max((n for d in rounds_by.values() for n in d.values()), default=0)
+    times = sorted(t for t in times if t)
+    window = f"{_hhmm(times[0])}–{_hhmm(times[-1])}" if times else ""
     data = dict(date=date_label, mkts=mkts, logos=logos, dark_logos=sorted(DARK_LOGOS_DEFAULT & set(logos.values())),
-                pieces=pieces, extras=extras)
+                pieces=pieces, extras=extras, devices=devices, rounds=rounds_by, window=window)
+    header = f"COLETA {date_label} · {' + '.join(d.upper() for d in devices)} · {len(mkts)} PAGINAS"
+    if n_rounds > 1:
+        header += f" · {n_rounds} RODADAS {window}"
     context = dict(
         page_title=f"ShelfProof {event_label} Showroom",
-        header_line=f"COLETA {date_label} · {' + '.join(sorted(d.upper() for d in devices))} · {len(mkts)} PAGINAS",
+        header_line=header,
         event_label=event_label,
         sites_text=", ".join(sites[:-1]) + (" e " + sites[-1] if len(sites) > 1 else (sites[0] if sites else "")),
         method_notes=method_notes(date_label, sessions, [m["name"] for k, m in mkts.items()
-                                                       if not any(p["m"] == k for p in pieces)], len(excluded)),
+                                                       if not any(p["m"] == k for p in pieces)], len(excluded),
+                                  n_rounds=n_rounds, window=window),
     )
     (out_dir / "data.json").write_text(json.dumps(dict(context=context, data=data), ensure_ascii=False, indent=1),
                                        encoding="utf-8")

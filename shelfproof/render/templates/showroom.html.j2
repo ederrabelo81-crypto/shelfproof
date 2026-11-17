@@ -81,6 +81,8 @@ h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4vw, 
 .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 
 /* video wall */
+.devsel { display: flex; gap: 8px; margin: 0 0 14px; }
+.wall.mobile { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .wall { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
 .screen { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; text-align: left; padding: 0; transition: border-color .2s; }
 .screen:hover { border-color: #3a4256; }
@@ -212,6 +214,7 @@ details.method ul { padding-left: 18px; max-width: 80ch; }
       <p>Cada tela repete em loop as peças salvas daquela home. A etiqueta mostra quem pagou e o código do espaço. Clique numa tela para abrir a galeria completa.</p>
       <div class="legend"><span><i class="dot" style="background:var(--paid)"></i>Mídia paga</span><span><i class="dot" style="background:var(--own)"></i>Campanha do marketplace</span><span><i class="dot" style="background:#b48cff"></i>Loja da própria marca</span></div>
     </div>
+    <div class="devsel" id="devSel" role="group" aria-label="Dispositivo" hidden></div>
     <div class="wall" id="wallGrid"></div>
   </section>
 
@@ -270,6 +273,11 @@ const DARK_LOGO = new Set(DATA.dark_logos);
 // k: paid | own | brand
 const P = DATA.pieces;
 const X = DATA.extras.map((r) => Object.assign({ img: null, k: 'paid', pos: '\u2014' }, r));
+// rodadas e celular (17/11/2026); o data.json do 11.11 nao tem esses campos: uma coleta, desktop
+const DEVS = DATA.devices && DATA.devices.length ? DATA.devices : ['desktop'];
+P.concat(X).forEach((r) => { if (!r.d) r.d = DEVS[0]; });
+const DEV_NAME = { desktop: 'Desktop', mobile: 'Celular' };
+const airTxt = (r) => (r.of > 1 ? 'em ' + r.seen + ' de ' + r.of + ' rodadas' : '');
 const ALL = P.concat(X);
 const PAID = ALL.filter((r) => r.k === 'paid');
 const KIND = { paid: ['paid', 'PAGO'], own: ['own', 'MARKETPLACE'], brand: ['brand', 'LOJA DA MARCA'] };
@@ -306,10 +314,14 @@ const track = $('#track');
 const mlogos = Object.keys(LOGOS);
 [...mlogos, ...mlogos].forEach((a) => track.append(logoChip(a)));
 
-// video wall
-const screens = [];
+// video wall (um dispositivo por vez)
+let screens = [], timers = [], wallDev = DEVS[0];
+function buildWall() {
+timers.forEach(clearInterval); timers = []; screens = [];
+$('#wallGrid').replaceChildren();
+$('#wallGrid').classList.toggle('mobile', wallDev === 'mobile');
 Object.entries(MKTS).forEach(([key, mk]) => {
-  const items = P.filter((r) => r.m === key);
+  const items = P.filter((r) => r.m === key && r.d === wallDev);
   const s = el('button', 'screen'); s.type = 'button'; s.setAttribute('aria-label', 'Abrir galeria de ' + mk.name);
   const top = el('div', 'screen-top'); const sw = el('span', 'mk-sw'); sw.style.background = mk.color;
   const cnt = el('span', 'cnt');
@@ -322,6 +334,7 @@ Object.entries(MKTS).forEach(([key, mk]) => {
     tag.append(el('span', 'pill ' + cls, lbl));
     if (r.k === 'paid') tag.append(el('span', 'pill', r.adv));
     tag.append(el('span', 'pill', r.slot));
+    if (r.of > 1) tag.append(el('span', 'pill', r.seen + '/' + r.of + ' rodadas'));
     d.append(bg, im, tag); stage.append(d); return d;
   });
   const cap = el('div', 'cap');
@@ -345,6 +358,26 @@ Object.entries(MKTS).forEach(([key, mk]) => {
   screens.push(st);
   s.addEventListener('click', () => openLb(key, st.i));
 });
+if (!reduce) {
+  screens.forEach((st, n) => {
+    const dur = 4200 + n * 350;
+    st.bars.forEach((b) => b.style.setProperty('--dur', dur + 'ms'));
+    timers.push(setInterval(() => { if (!document.hidden) show(st, st.i + 1); }, dur));
+  });
+}
+}
+if (DEVS.length > 1) {
+  DEVS.forEach((d) => {
+    const b = el('button', 'chipbtn', DEV_NAME[d] || d); b.type = 'button'; b.dataset.dev = d;
+    b.append(el('span', 'pill', String(P.filter((r) => r.d === d).length)));
+    b.addEventListener('click', () => { wallDev = d; markDev(); buildWall(); });
+    $('#devSel').append(b);
+  });
+  $('#devSel').hidden = false;
+}
+function markDev() { document.querySelectorAll('#devSel .chipbtn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dev === wallDev))); }
+markDev();
+buildWall();
 function show(st, i) {
   st.i = (i + st.items.length) % st.items.length;
   st.slides.forEach((d, j) => d.classList.toggle('on', j === st.i));
@@ -352,13 +385,6 @@ function show(st, i) {
   const r = st.items[st.i];
   st.cap.textContent = r.title;
   st.cnt.textContent = (st.i + 1) + '/' + st.items.length;
-}
-if (!reduce) {
-  screens.forEach((st, n) => {
-    const dur = 4200 + n * 350;
-    st.bars.forEach((b) => b.style.setProperty('--dur', dur + 'ms'));
-    setInterval(() => { if (!document.hidden) show(st, st.i + 1); }, dur);
-  });
 }
 
 // leaderboard
@@ -382,12 +408,13 @@ if (unk) {
   $('#boardList').append(note);
 }
 
-// ownership
-Object.entries(MKTS).forEach(([key, mk]) => {
-  const items = P.filter((r) => r.m === key);
+// ownership (uma linha por site e dispositivo)
+Object.entries(MKTS).forEach(([key, mk]) => DEVS.forEach((dev) => {
+  const items = P.filter((r) => r.m === key && r.d === dev);
+  if (DEVS.length > 1 && !items.length && !X.some((r) => r.m === key && r.d === dev) && !(DATA.rounds && DATA.rounds[key] && DATA.rounds[key][dev])) return;
   const c = { paid: 0, own: 0, brand: 0 }; items.forEach((r) => c[r.k]++);
   const row = el('div', 'own-row');
-  const name = el('span', 'mk', mk.name);
+  const name = el('span', 'mk', DEVS.length > 1 ? mk.name + ' · ' + (DEV_NAME[dev] || dev) : mk.name);
   const stack = el('div', 'stack'); stack.setAttribute('role', 'img');
   stack.setAttribute('aria-label', mk.name + ': ' + c.paid + ' pagas, ' + c.own + ' do marketplace, ' + c.brand + ' da marca');
   [['paid', 'var(--paid)'], ['own', 'var(--own)'], ['brand', '#b48cff']].forEach(([k, col]) => {
@@ -395,7 +422,7 @@ Object.entries(MKTS).forEach(([key, mk]) => {
   });
   row.append(name, stack, el('span', 'tot', items.length ? Math.round(100 * c.paid / items.length) + '% pago' : 'sem peças'));
   $('#ownGrid').append(row);
-});
+}));
 
 // proof of placement
 const proofAdvs = byAdv.map((o) => o.adv);
@@ -416,7 +443,11 @@ function renderProof() {
     else shot.textContent = 'Registro de código: posição paga encontrada no HTML, sem imagem salva';
     c.append(shot, el('span', 'stamp', r.img ? 'Veiculado ✓ ' + DATE : 'Detectado ✓ ' + DATE));
     const dl = el('dl');
-    [['Página', MKTS[r.m].name], ['Slot', r.slot], ['Posição', r.pos === '—' ? 'não informada' : r.pos + 'ª faixa da home'], ['Peça', r.title], ['Coleta', DATE + ' · desktop']].forEach(([k, v]) => dl.append(el('dt', null, k), el('dd', null, v)));
+    const when = r.t0 ? (r.t0 === r.t1 ? ' · ' + r.t0 : ' · ' + r.t0 + '–' + r.t1) : '';
+    const rows = [['Página', MKTS[r.m].name], ['Slot', r.slot], ['Posição', r.pos === '—' ? 'não informada' : r.pos + 'ª faixa da home'], ['Peça', r.title], ['Coleta', DATE + ' · ' + (DEV_NAME[r.d] || r.d).toLowerCase() + when]];
+    if (r.of > 1) rows.push(['No ar', airTxt(r)]);
+    if (r.air) rows.push(['1ª tela', 'visível em ' + r.air.replace('/', ' de ') + ' quadros do carrossel']);
+    rows.forEach(([k, v]) => dl.append(el('dt', null, k), el('dd', null, v)));
     c.append(dl); g.append(c);
   });
 }
@@ -442,12 +473,14 @@ renderProof();
 const lb = $('#lb'); let lbKey = null, lbI = 0;
 function openLb(key, i) { lbKey = key; lbI = i; drawLb(); try { lb.showModal(); } catch (e) { lb.setAttribute('open', ''); } }
 function drawLb() {
-  const items = P.filter((r) => r.m === lbKey); lbI = (lbI + items.length) % items.length; const r = items[lbI];
+  const items = P.filter((r) => r.m === lbKey && r.d === wallDev); lbI = (lbI + items.length) % items.length; const r = items[lbI];
   $('#lbSw').style.background = MKTS[lbKey].color; $('#lbTitle').textContent = MKTS[lbKey].name;
   $('#lbCount').textContent = (lbI + 1) + '/' + items.length;
   $('#lbImg').src = imgSrc(r.img); $('#lbImg').alt = r.adv + ': ' + r.title;
   const meta = $('#lbMeta'); meta.replaceChildren(); const [cls, lbl] = KIND[r.k];
-  meta.append(el('span', 'pill ' + cls, lbl), el('span', 'pill', r.adv), el('span', 'pill', r.slot), el('span', null, r.title));
+  meta.append(el('span', 'pill ' + cls, lbl), el('span', 'pill', r.adv), el('span', 'pill', r.slot));
+  if (r.of > 1) meta.append(el('span', 'pill', 'no ar ' + airTxt(r) + (r.t0 ? ' · ' + r.t0 + '–' + r.t1 : '')));
+  meta.append(el('span', null, r.title));
   const th = $('#lbThumbs'); th.replaceChildren();
   items.forEach((it, j) => { const b = el('button'); b.type = 'button'; b.setAttribute('aria-current', String(j === lbI)); b.setAttribute('aria-label', it.title); const im = new Image(); im.src = imgSrc(it.img); im.alt = ''; b.append(im); b.addEventListener('click', () => { lbI = j; drawLb(); }); th.append(b); });
 }

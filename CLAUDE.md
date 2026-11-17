@@ -58,8 +58,11 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
    Exceção autorizada em 12/11/2026: **`anon_warm`** para sites com Akamai (Magalu,
    Casas Bahia), que negam contexto novo e vazio (403). Usa a sessão do perfil
    dedicado `chrome_profile_shelfproof`, que **nunca** faz login e só visita homes,
-   aquecida na home (espera o `_abck` validar). Só desktop. Rotulada no manifest
+   aquecida na home (espera o `_abck` validar). Rotulada no manifest
    (`session`, `warmup`). Nunca logar nesse perfil nem navegar produtos nele.
+   Celular (17/11/2026): a aba é emulada pelo CDP (tela, toque, UA e client hints de
+   Android com a versão real do Chrome, `capture.emulate_mobile_tab`) e aquece de novo
+   como celular; manifest `emulation: "cdp_tab"`. **Ainda não validado no campo.**
 4. **Chrome COMUM + CDP**, porta **9223** e perfil `data/chrome_profile_shelfproof`
    (o RAC usa 9222 e `data/chrome_profile`; os dois rodam no mesmo PC). Nunca
    `launch_persistent_context` em site com antibot. `--engine launch` é só para
@@ -90,7 +93,7 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 57 testes; os e2e pulam sem Chrome
+pytest -q                                   # 64 testes; os e2e pulam sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
@@ -105,14 +108,21 @@ python -m shelfproof detect-file pagina.html --paid-only
 python -m shelfproof analyze --vision runs/<data>/<captura>
 python -m shelfproof vision-eval            # acerto no 11.11: >= 80% e 0 erradas
 
-# Evento inteiro: todas as homes de config/targets.json -> Showroom
-python -m shelfproof event --event "Black Friday" --date 27/11/2026
-python -m shelfproof contact-sheet runs/showroom/black-friday   # revisar, depois:
-python -m shelfproof showroom <run_dirs...> --event "Black Friday" --date 27/11/2026 \
-       --out runs/showroom/black-friday --review review.json
+# Coleta do dia: cada `event` = UMA rodada (todas as homes, desktop + celular).
+# Rodar de novo no mesmo dia soma no Showroom do dia (runs/showroom/AAAA-MM-DD/,
+# rounds.json), com "no ar em X de Y rodadas" e a janela de horário por peça.
+python -m shelfproof event                                  # "Vitrine do dia"
+python -m shelfproof event --event "Black Friday"           # nome no Showroom
+python -m shelfproof event --only "Magalu,Casas Bahia" --devices mobile
+python -m shelfproof contact-sheet runs/showroom/2026-11-17 # revisar; review.json na mesma pasta
+python -m shelfproof event --rebuild                        # refaz o dia sem capturar
 ```
 
-Windows (PC coletor): `scripts\coleta_evento.bat "Black Friday" 27/11/2026`.
+Windows (PC coletor), à mão por enquanto (agendamento a cada hora vem depois):
+`scripts\coleta_dia.bat` (uma rodada; aceita as opções do `event`),
+`scripts\remontar_dia.bat` (depois do `review.json`), `scripts\publicar_dia.bat`.
+Imagens no `review.json`: `<site>_<nn>` no desktop e `<site>_m_<nn>` no celular; a
+numeração segue a ordem em que a peça apareceu, então uma rodada nova não renumera.
 
 Publicar no site (Vercel, projeto `shelfproof-showroom`; `site/` fica fora do git):
 `scripts\publicar_site.bat runs\showroom\2026-11-12 2026-11-12`

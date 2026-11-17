@@ -1,16 +1,14 @@
 @echo off
-REM Shelf Proof - coleta de evento (todas as homes de config\targets.json, desktop + mobile)
-REM Uso: scripts\coleta_evento.bat "Black Friday" 27/11/2026
+REM Shelf Proof - rodada de coleta com o nome do evento no Showroom.
+REM Uso: scripts\coleta_evento.bat "Black Friday"
+REM A data e sempre a de HOJE (a pasta e runs\showroom\AAAA-MM-DD); rode no dia do evento.
 REM ASCII only (ver COMMON_MISTAKES R13).
 setlocal
 cd /d "%~dp0.."
-if not exist logs mkdir logs
-set RAC_LOCAL_CHROME=1
-if "%RAC_CDP_PORT%"=="" set RAC_CDP_PORT=9223
 if "%~1"=="" (
-  echo Uso: scripts\coleta_evento.bat "Nome do evento" DD/MM/AAAA
+  echo Uso: scripts\coleta_evento.bat "Nome do evento"
   exit /b 1
 )
-python -m shelfproof event --event "%~1" --date %2 >> logs\coleta_evento.log 2>&1
-echo Fim. Log em logs\coleta_evento.log
+if not "%~2"=="" echo Aviso: a data da coleta e sempre a de hoje; "%~2" foi ignorado.
+call scripts\coleta_dia.bat --event "%~1"
 endlocal

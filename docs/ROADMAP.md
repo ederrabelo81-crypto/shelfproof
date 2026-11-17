@@ -8,7 +8,7 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 | 1 · Esqueleto | Projeto, detector com regressão nas 6 homes, robô, pipeline, template | `pytest` verde (19), e2e local | ✅ 12/11 |
 | 2 · Campo | Rodar `capture` nas 6 homes reais, desktop + mobile, sem login | 6×2 capturas com `ok=true`; regras ajustadas para o HTML **renderizado** e para o **mobile** | ⬜ até 18/11 |
 | 3 · Visão | Anunciante pela imagem quando o HTML não diz (displays Amazon/ML, Sponsored Brands) | ≥ 80% dos `Nao identificado` resolvidos, com a evidência "lido na imagem", e **nenhuma marca errada** (`vision-eval`) | ✅ 12/11: 17/19 certas, 0 erradas (89,5%) |
-| 4 · Evento | `event` agendado a cada 2 h no dia; rotação e tempo no ar ao longo do dia | Showroom da BF com desktop × mobile e tempo no ar | ⬜ 27/11 |
+| 4 · Evento | Rodadas do dia (`event` à mão; depois agendado a cada 1 h); rotação e tempo no ar ao longo do dia | Showroom da BF com desktop × mobile e tempo no ar | 🟡 17/11: rodadas + celular no código; falta validar no PC e agendar |
 | 5 · Prova | Recorte do slot no print + PDF de evidência por anunciante | PDF de uma marca pronto para enviar | ⬜ dez/26 |
 | 6 · Jornada | Home → categoria → busca → produto; funil de exposição | 1 jornada roteirizada por site | ⬜ dez/26 |
 | 7 · Produto | Histórico por evento, comparação entre datas, multi-cliente | Portal ou relatório recorrente | ⬜ 2027 |
@@ -48,6 +48,20 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
   (Rockstar Games)", nome de franquia) entra com `needs_review` e aparece em `summary.json` → `paid_needs_review`:
   conferir e, se for o caso, incluir a marca no dicionário.
 - `people_present=sim` em `Piece.extra` ajuda a folha de contato; a decisão continua humana (regra 8).
+
+## Fase 4 — como está (17/11)
+
+- `python -m shelfproof event` = uma rodada; `runs/showroom/<AAAA-MM-DD>/rounds.json` guarda as
+  capturas de cada rodada e o Showroom do dia é refeito somando todas (`shelfproof/rounds.py`).
+- A mesma peça (mesmo slot + mesma imagem) em várias rodadas vira uma, com `seen`/`of`, `t0`–`t1`
+  e o tempo na 1ª tela somado. Repetida na MESMA captura continua sendo duas posições (S4).
+- Showroom: seletor Desktop/Celular no video wall; propriedade por site × dispositivo; prova com
+  dispositivo, horário e "no ar em X de Y rodadas". O data.json do 11.11 continua abrindo igual.
+- Celular no Magalu/Casas Bahia: `anon_warm` com a aba emulada pelo CDP. Validar no PC:
+  `scripts\coleta_dia.bat --only "Magalu,Casas Bahia" --devices mobile` e conferir `full.jpg`
+  (layout de celular?), `manifest.warmup.abck` e `http_status`.
+- Próximo: rodar à mão alguns dias; quando estiver estável, agendar `coleta_dia.bat` a cada hora
+  (Agendador de Tarefas do Windows).
 
 ## Riscos
 

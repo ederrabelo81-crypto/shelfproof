@@ -7,6 +7,7 @@ shelf-proof/
 ├── shelfproof/
 │   ├── models.py                 # Piece, BBox (hierarquia Captura > Zona > Slot > Peça > Item)
 │   ├── cli.py / __main__.py      # capture | analyze | detect-file | showroom | contact-sheet | event
+│   ├── rounds.py                 # coleta do dia em rodadas: rounds.json -> Showroom do dia
 │   ├── pipeline.py               # captura -> pieces.json + summary.json (caixa, dobra, imagem, tempo no ar)
 │   ├── browser/                  # VENDORIZADO do RAC: playwright_runtime + local_browser (+ new_isolated_context)
 │   ├── collect/capture.py        # robô: abre, observa carrossel, rola, salva print/HTML/imagens/elements
@@ -17,7 +18,7 @@ shelf-proof/
 │   │   ├── advertiser.py         # fase 3: anunciante lido na imagem (Claude API), cache vision.json
 │   │   └── evaluate.py           # vision-eval: acerto contra as peças pagas do 11.11
 │   └── render/
-│       ├── showroom.py           # dados -> index.html + img/ + logo/
+│       ├── showroom.py           # dados -> index.html + img/ + logo/ (junta rodadas e desktop x celular)
 │       ├── contact_sheet.py      # folha de contato para revisão humana
 │       ├── site.py               # site estático (Vercel): site/<slug>/ + índice dos eventos
 │       └── templates/showroom.html.j2   # o Showroom aprovado, com DATA em JSON

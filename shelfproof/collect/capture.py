@@ -303,12 +303,43 @@ def context_options(device: str, real_chrome_version: str = "") -> Dict[str, Any
     return opts
 
 
+def mobile_ua_metadata(chrome_version: str) -> Dict[str, Any]:
+    """Client hints de um Chrome Android com a MESMA versao do Chrome que esta rodando (S9)."""
+    full = chrome_version if re.match(r"^\d+\.", chrome_version or "") else "131.0.0.0"
+    major = full.split(".")[0]
+    return {
+        "brands": [{"brand": "Chromium", "version": major}, {"brand": "Google Chrome", "version": major},
+                   {"brand": "Not_A Brand", "version": "24"}],
+        "fullVersion": full, "platform": "Android", "platformVersion": "14.0.0",
+        "architecture": "", "model": "Pixel 8", "mobile": True,
+    }
+
+
+def emulate_mobile_tab(page: Any, chrome_version: str = "") -> Any:
+    """Celular numa aba do perfil dedicado (anon_warm): tela, toque, UA e client hints pelo CDP.
+
+    E o que o modo dispositivo do DevTools faz. Precisa vir ANTES do aquecimento e do goto:
+    o Akamai le o UA no sensor e o _abck validado tem de ser o do celular.
+    """
+    vp = DEVICES["mobile"]["viewport"]
+    ua = context_options("mobile", chrome_version)["user_agent"]
+    cdp = page.context.new_cdp_session(page)
+    cdp.send("Emulation.setUserAgentOverride", {
+        "userAgent": ua, "acceptLanguage": "pt-BR,pt;q=0.9", "platform": "Linux armv8l",
+        "userAgentMetadata": mobile_ua_metadata(chrome_version)})
+    cdp.send("Emulation.setDeviceMetricsOverride", {
+        "width": vp["width"], "height": vp["height"], "mobile": True,
+        "deviceScaleFactor": DEVICES["mobile"]["device_scale_factor"]})
+    cdp.send("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5})
+    return cdp
+
+
 def _open_context(cfg: CaptureConfig):
     """Devolve (context, page, cleanup). Levanta RuntimeError se nao houver navegador."""
     if cfg.session not in SESSIONS:
         raise RuntimeError(f"sessao desconhecida: {cfg.session}")
-    if cfg.session == "anon_warm" and (cfg.engine != "cdp" or cfg.device != "desktop"):
-        raise RuntimeError("sessao anon_warm so existe no Chrome local (cdp) e em desktop")
+    if cfg.session == "anon_warm" and cfg.engine != "cdp":
+        raise RuntimeError("sessao anon_warm so existe no Chrome local (cdp)")
     opts = dict(DEVICES[cfg.device], **CONTEXT_COMMON)
     if cfg.engine == "cdp":
         from shelfproof.browser.local_browser import get_local_browser
@@ -326,12 +357,21 @@ def _open_context(cfg: CaptureConfig):
         opts = context_options(cfg.device, version)
         if cfg.session == "anon_warm":
             # Sessao do perfil DEDICADO do Shelf Proof (nunca logado), aquecida na home como no
-            # RAC: o Akamai da Magalu nega contexto novo e vazio (403 em 12/11/2026). So desktop:
-            # o contexto ja existente nao troca UA/touch, entao nao ha celular de verdade aqui.
+            # RAC: o Akamai da Magalu nega contexto novo e vazio (403 em 12/11/2026).
+            # Celular (17/11/2026): o contexto ja existente nao troca UA/touch pelo Playwright,
+            # entao a ABA e emulada pelo CDP (o mesmo "modo dispositivo" do DevTools).
             page = lb.new_page()
             if page is None:
                 raise RuntimeError("Aba nao abriu no Chrome local")
-            page.set_viewport_size(DEVICES["desktop"]["viewport"])
+            if cfg.device == "mobile":
+                try:
+                    cdp = emulate_mobile_tab(page, version)
+                except Exception:
+                    page.close()
+                    raise
+                page._shelfproof_cdp = cdp  # mantem a sessao CDP (e a emulacao) viva com a aba
+            else:
+                page.set_viewport_size(DEVICES["desktop"]["viewport"])
             return lb.context, page, page.close
         if cfg.session == "anon":
             ctx = lb.new_isolated_context(**opts)
@@ -384,7 +424,7 @@ def _human_scroll(page: Any, max_steps: int) -> int:
     return int(page.evaluate("document.documentElement.scrollHeight"))
 
 
-def _warm_up(page: Any, url: str) -> Dict[str, Any]:
+def _warm_up(page: Any, url: str, device: str = "desktop") -> Dict[str, Any]:
     """Aquece a sessao na home do site (como o RAC): visita, mexe o mouse, rola e, em site
     com Akamai, espera o _abck validar. Devolve o que aconteceu, para o manifest."""
     from shelfproof.browser.local_browser import get_local_browser
@@ -393,8 +433,9 @@ def _warm_up(page: Any, url: str) -> Dict[str, Any]:
     home = f"{u.scheme}://{u.netloc}/"
     akamai = any(h in u.netloc for h in AKAMAI_HOSTS)
     lb = get_local_browser()
-    ok = bool(lb) and lb.warmup(page, home, wait_abck=akamai, host_key=u.netloc)
-    info: Dict[str, Any] = {"home": home, "akamai": akamai, "ok": bool(ok)}
+    # o celular aquece de novo: o _abck validado com o UA do desktop nao vale para o do celular
+    ok = bool(lb) and lb.warmup(page, home, wait_abck=akamai, host_key=f"{u.netloc}#{device}")
+    info: Dict[str, Any] = {"home": home, "akamai": akamai, "ok": bool(ok), "device": device}
     if akamai:
         try:
             ck = next((c["value"] for c in page.context.cookies(home) if c["name"] == "_abck"), "")
@@ -514,7 +555,9 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
     try:
         if cfg.session == "anon_warm":
             try:
-                manifest["warmup"] = _warm_up(page, cfg.url)
+                if cfg.device == "mobile":
+                    manifest["emulation"] = "cdp_tab"  # celular emulado na aba do perfil dedicado
+                manifest["warmup"] = _warm_up(page, cfg.url, cfg.device)
                 logger.info(f"[capture] aquecimento: {manifest['warmup']}")
             except Exception as exc:
                 errors.append(f"aquecimento: {exc}")

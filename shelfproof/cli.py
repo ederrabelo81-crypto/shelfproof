@@ -3,7 +3,9 @@
     python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
     python -m shelfproof analyze runs/2026-11-27/magazineluiza-com-br_desktop_anon_080102
     python -m shelfproof detect-file pagina_salva.html
-    python -m shelfproof event --targets config/targets.json --event "Black Friday" --date 27/11/2026
+    python -m shelfproof event                                # 1 rodada do dia (desktop + celular)
+    python -m shelfproof event --event "Black Friday" --date 27/11/2026
+    python -m shelfproof event --rebuild                      # refaz o Showroom do dia (review.json)
     python -m shelfproof showroom --event "Black Friday" --date 27/11/2026 --out out/bf <run_dir> ...
     python -m shelfproof contact-sheet out/bf
     python -m shelfproof analyze --vision <run_dir>          # fase 3: anunciante lido na imagem
@@ -35,9 +37,6 @@ def _cmd_capture(a: argparse.Namespace) -> int:
     from shelfproof.pipeline import analyze
 
     devices = ["desktop", "mobile"] if a.device == "both" else [a.device]
-    if a.session == "anon_warm" and "mobile" in devices:
-        logger.warning("anon_warm so existe em desktop: o celular nao sera capturado nesta sessao")
-        devices = [d for d in devices if d == "desktop"]
     reader = _reader(a)
     rc = 0
     for dev in devices:
@@ -92,36 +91,80 @@ def _cmd_contact(a: argparse.Namespace) -> int:
 
 
 def _cmd_event(a: argparse.Namespace) -> int:
-    """Captura todos os alvos (desktop + mobile, anonimo), analisa e monta o Showroom."""
-    from shelfproof.collect.capture import CaptureConfig, capture
+    """UMA rodada: captura todos os alvos (desktop + celular, sem login), analisa e refaz o
+    Showroom do dia somando todas as rodadas ja feitas (runs/showroom/<AAAA-MM-DD>/rounds.json).
+    Rodar de novo no mesmo dia = mais uma rodada (rotacao e tempo no ar ao longo do dia)."""
+    from shelfproof.collect.capture import CaptureConfig, capture, now_brt
     from shelfproof.pipeline import analyze
-    from shelfproof.render.showroom import build_from_runs
+    from shelfproof.rounds import add_round, build_day, day_dir, parse_date
 
+    day = parse_date(a.date) if a.date else now_brt().date()
+    sdir = day_dir(Path(a.out), day)
+    if a.rebuild:
+        out = build_day(sdir, a.event, devices=_devices(a.showroom_device))
+        print(out if out else "Nenhuma rodada registrada neste dia")
+        return 0 if out else 2
+
+    try:  # log da rodada em arquivo, alem do console (para conferir depois o que falhou)
+        Path("logs").mkdir(exist_ok=True)
+        logger.add(f"logs/coleta_{day.isoformat()}.log", level="INFO", encoding="utf-8")
+    except Exception as exc:
+        logger.warning(f"log em arquivo indisponivel: {exc}")
     targets = json.loads(Path(a.targets).read_text(encoding="utf-8"))["targets"]
+    only = {s.strip().lower() for s in (a.only or "").split(",") if s.strip()}
+    if only:
+        targets = [t for t in targets if t["name"].lower() in only]
     reader = _reader(a)
-    runs: List[Path] = []
+    started = now_brt()
+    done: List[dict] = []
     for t in targets:
         for dev in t.get("devices", ["desktop", "mobile"]):
-            # anon_warm (targets.json) so existe em desktop; o celular segue no contexto limpo
-            session = t.get("session", "anon")
-            if session == "anon_warm" and dev != "desktop":
-                session = "anon"
-            try:
-                res = capture(CaptureConfig(url=t["url"], device=dev, session=session, out_root=Path(a.out)))
-            except Exception as exc:  # um site nao derruba o evento
-                logger.error(f"{t['url']} ({dev}): {exc}")
+            if dev not in _devices(a.devices):
                 continue
+            session = t.get("session", "anon")
+            try:
+                res = capture(CaptureConfig(url=t["url"], device=dev, session=session, out_root=Path(a.out),
+                                            carousel_seconds=a.carousel))
+            except Exception as exc:  # um site nao derruba a rodada
+                logger.error(f"{t['url']} ({dev}): {exc}")
+                done.append({"site": t["name"], "device": dev, "ok": False, "error": str(exc)})
+                continue
+            row = {"site": t["name"], "device": dev, "session": session, "ok": bool(res.ok),
+                   "blocked": bool(res.blocked), "run_dir": str(res.run_dir)}
             if res.ok:
-                analyze(res.run_dir, reader=reader)
-                if dev == a.showroom_device:
-                    runs.append(res.run_dir)
-    if not runs:
-        logger.error("Nenhuma captura util: nada para montar")
+                try:
+                    ps = analyze(res.run_dir, reader=reader)
+                    row.update(pieces=len(ps), paid=sum(1 for p in ps if p.is_paid))
+                except Exception as exc:
+                    row.update(ok=False, error=f"analise: {exc}")
+                    logger.error(f"{t['url']} ({dev}) analise: {exc}")
+            else:
+                row["error"] = "; ".join(res.errors[-2:])
+            done.append(row)
+    rnd = add_round(sdir, started, done, a.event)
+    print(f"Rodada {rnd} de {day.strftime('%d/%m/%Y')}:")
+    for r in done:
+        st = "OK" if r["ok"] else ("BLOQUEADO" if r.get("blocked") else "FALHOU")
+        extra = f"{r.get('pieces', 0)} pecas, {r.get('paid', 0)} pagas" if r["ok"] else r.get("error", "")
+        print(f"  {st:9} {r['site']:14} {r['device']:7} {extra}")
+    out = build_day(sdir, a.event, devices=_devices(a.showroom_device))
+    if not out:
+        logger.error("Nenhuma captura util no dia: nada para montar")
         return 2
-    slug = a.event.lower().replace(" ", "-").replace(".", "")
-    out = build_from_runs(runs, Path(a.out) / "showroom" / slug, a.event, a.date)
     print(out)
+    return 0 if all(r["ok"] for r in done) else 1
+
+
+def _cmd_today(a: argparse.Namespace) -> int:
+    """Data de hoje em BRT (AAAA-MM-DD): os .bat usam para achar a pasta do dia."""
+    from shelfproof.collect.capture import now_brt
+
+    print(now_brt().date().isoformat())
     return 0
+
+
+def _devices(v: str) -> List[str]:
+    return ["desktop", "mobile"] if v == "both" else [v]
 
 
 def _cmd_site(a: argparse.Namespace) -> int:
@@ -185,14 +228,24 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("showroom_dir")
     c.set_defaults(fn=_cmd_contact)
 
-    c = sub.add_parser("event", help="captura todos os alvos e monta o Showroom do evento")
+    c = sub.add_parser("event", help="uma rodada: captura todos os alvos e refaz o Showroom do dia")
     c.add_argument("--targets", default="config/targets.json")
-    c.add_argument("--event", required=True)
-    c.add_argument("--date", required=True)
-    c.add_argument("--showroom-device", default="desktop")
+    c.add_argument("--event", default=None, help="nome no Showroom (ex.: Black Friday; padrao: o da 1a rodada "
+                   "do dia ou 'Vitrine do dia')")
+    c.add_argument("--date", default="", help="DD/MM/AAAA (padrao: hoje, BRT)")
+    c.add_argument("--devices", choices=["desktop", "mobile", "both"], default="both",
+                   help="o que capturar nesta rodada (respeita os devices de cada alvo)")
+    c.add_argument("--only", default="", help="so estes alvos, pelo nome: \"Magalu,Casas Bahia\"")
+    c.add_argument("--showroom-device", choices=["desktop", "mobile", "both"], default="both")
+    c.add_argument("--carousel", type=float, default=24.0, help="segundos observando a 1a tela")
+    c.add_argument("--rebuild", action="store_true",
+                   help="nao captura: so refaz o Showroom do dia (ex.: depois do review.json)")
     c.add_argument("--out", default="runs")
     c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
     c.set_defaults(fn=_cmd_event)
+
+    c = sub.add_parser("today", help="data de hoje em BRT (AAAA-MM-DD), para os scripts")
+    c.set_defaults(fn=_cmd_today)
 
     c = sub.add_parser("site", help="copia um Showroom para o site estatico (site/<slug>) e refaz o indice")
     c.add_argument("showroom_dir")

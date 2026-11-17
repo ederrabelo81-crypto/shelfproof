@@ -95,13 +95,13 @@ def test_user_agent_segue_o_chrome_real():
     assert "Chrome/131" in context_options("desktop", "")["user_agent"]
 
 
-def test_anon_warm_so_em_desktop_e_falha_com_manifest(tmp_path: Path):
+def test_anon_warm_so_no_chrome_local_e_falha_com_manifest(tmp_path: Path):
     import json
 
     from shelfproof.collect.capture import CaptureConfig, capture
 
     res = capture(CaptureConfig(url="https://www.magazineluiza.com.br/", device="mobile",
-                                session="anon_warm", out_root=tmp_path))
+                                session="anon_warm", engine="launch", out_root=tmp_path))
     assert not res.ok and any("so existe" in e for e in res.errors)
     man = json.loads((res.run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert man["session"] == "anon_warm" and man["errors"] == res.errors
