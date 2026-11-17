@@ -96,7 +96,7 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 79 testes; os e2e pulam sem Chrome
+pytest -q                                   # 77 testes; os e2e pulam sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
