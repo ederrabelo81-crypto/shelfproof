@@ -62,7 +62,8 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
    (`session`, `warmup`). Nunca logar nesse perfil nem navegar produtos nele.
    Celular (17/11/2026): a aba é emulada pelo CDP (tela, toque, UA e client hints de
    Android com a versão real do Chrome, `capture.emulate_mobile_tab`) e aquece de novo
-   como celular; manifest `emulation: "cdp_tab"`. **Ainda não validado no campo.**
+   como celular; manifest `emulation: "cdp_tab"`. Akamai aceitou (17/11, `_abck` validado);
+   os cookies do site voltam ao estado do desktop ao fechar a aba (COMMON_MISTAKES S19).
 4. **Chrome COMUM + CDP**, porta **9223** e perfil `data/chrome_profile_shelfproof`
    (o RAC usa 9222 e `data/chrome_profile`; os dois rodam no mesmo PC). Nunca
    `launch_persistent_context` em site com antibot. `--engine launch` é só para
@@ -93,7 +94,7 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 64 testes; os e2e pulam sem Chrome
+pytest -q                                   # 70 testes; os e2e pulam sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both

@@ -264,3 +264,64 @@ def test_imagem_da_amazon_casa_sem_os_modificadores():
     browser = base + "_CB791431263,T1_FMavif_SF1282.5,2052_QL54_.jpg?aicid=homepage-single-creative-card"
     other = "https://m.media-amazon.com/images/I/81zzzzzzzzL._SF1282.5,2052_QL80_.jpg"
     assert _src_key(html) == _src_key(browser) != _src_key(other)
+
+
+def test_flush_nao_le_resposta_inacabada_nem_passa_do_prazo(tmp_path: Path):
+    # Magalu desktop 17/11/2026: response.body() de uma resposta sem fim parou a captura 17 min
+    class Req:
+        def __init__(self, end): self.timing = {"responseEnd": end}
+
+    class Resp:
+        def __init__(self, url, end):
+            self.url, self.request, self.headers = url, Req(end), {"content-type": "image/png"}
+
+        def body(self):
+            if self.request.timing["responseEnd"] < 0:
+                raise AssertionError("leu corpo de resposta inacabada")
+            return b"\x89PNG\r\n\x1a\n" + b"0" * 5000
+
+    sink = _ImageSink(tmp_path, min_bytes=4000)
+    sink.pending = [Resp("https://x/a.png", 120.0), Resp("https://x/stream.png", -1)]
+    st = sink.flush()
+    assert st == {"read": 1, "unfinished": 1, "over_budget": 0}
+    assert list(sink.index) == ["https://x/a.png"]
+    sink.pending = [Resp("https://x/b.png", 1.0)]
+    assert sink.flush(budget_s=-1)["over_budget"] == 1
+
+
+def test_site_de_celular_e_dominio():
+    from shelfproof.collect.capture import _is_mobile_site, _site_domain
+
+    assert _is_mobile_site("https://m.magazineluiza.com.br/", "https://www.magazineluiza.com.br/")
+    assert not _is_mobile_site("https://www.magazineluiza.com.br/", "https://www.magazineluiza.com.br/")
+    assert _site_domain("https://m.magazineluiza.com.br/x") == "magazineluiza.com.br"
+    assert _site_domain("https://www.casasbahia.com.br/") == "casasbahia.com.br"
+
+
+def test_cookies_do_site_voltam_ao_estado_do_desktop():
+    pytest = __import__("pytest")
+    from shelfproof.browser import playwright_runtime
+    from shelfproof.collect.capture import restore_site_cookies, snapshot_site_cookies
+
+    pw, _ = playwright_runtime.acquire()
+    if pw is None:
+        pytest.skip("sem playwright")
+    try:
+        try:
+            browser = pw.chromium.launch(headless=True, channel="chrome")
+        except Exception:
+            browser = pw.chromium.launch(headless=True)
+        ctx = browser.new_context()
+        url = "https://www.magazineluiza.com.br/"
+        ctx.add_cookies([{"name": "_abck", "value": "desk~0~", "domain": ".magazineluiza.com.br", "path": "/"},
+                         {"name": "outro", "value": "1", "domain": "example.com", "path": "/"}])
+        snap = snapshot_site_cookies(ctx, url)
+        # o celular troca o _abck e deixa um cookie de versao no m.
+        ctx.add_cookies([{"name": "_abck", "value": "mob~0~", "domain": ".magazineluiza.com.br", "path": "/"},
+                         {"name": "versao", "value": "mobile", "domain": "m.magazineluiza.com.br", "path": "/"}])
+        restore_site_cookies(ctx, url, snap)
+        got = {(c["name"], c["value"], c["domain"]) for c in ctx.cookies()}
+        assert got == {("_abck", "desk~0~", ".magazineluiza.com.br"), ("outro", "1", "example.com")}
+        browser.close()
+    finally:
+        playwright_runtime.release()

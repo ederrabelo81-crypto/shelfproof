@@ -254,26 +254,47 @@ class _ImageSink:
         (self.folder / name).write_bytes(body)
         self.index[url] = name
 
-    def flush(self) -> None:
-        """Le os corpos das respostas anotadas (fora do handler de eventos)."""
+    def flush(self, budget_s: float = 90.0) -> Dict[str, int]:
+        """Le os corpos das respostas anotadas (fora do handler de eventos).
+
+        ``response.body()`` nao tem tempo limite: numa resposta que nunca termina ele espera para
+        sempre (Magalu desktop 17/11/2026: 17 min parado aqui). So le resposta ja terminada
+        (``request.timing.responseEnd``) e para no prazo; o que ficou de fora e buscado de novo
+        pelo endereco em ``fetch_missing()``, que tem tempo limite.
+        """
         pending, self.pending = self.pending, []
+        stats = {"read": 0, "unfinished": 0, "over_budget": 0}
+        t0 = time.monotonic()
         for resp in pending:
             try:
                 if resp.url in self.index:
                     continue
+                if time.monotonic() - t0 > budget_s:
+                    stats["over_budget"] += 1
+                    continue
+                timing = getattr(resp.request, "timing", None) or {}
+                if timing and float(timing.get("responseEnd", 0) or 0) < 0:
+                    stats["unfinished"] += 1
+                    continue
+                stats["read"] += 1
                 ctype = (resp.headers or {}).get("content-type", "")
                 self._save(resp.url, ctype, resp.body())
             except Exception as exc:  # redirect/streaming sem corpo
                 self._fail(f"corpo {resp.url[:80]}", exc)
+        return stats
 
-    def fetch_missing(self, request: Any, urls: List[str]) -> int:
+    def fetch_missing(self, request: Any, urls: List[str], budget_s: float = 90.0) -> int:
         """Busca de novo as imagens da pagina que nao vieram pelo evento (ex.: cache do navegador)."""
         got = 0
+        t0 = time.monotonic()
         for url in dict.fromkeys(urls):
             if not url.startswith("http") or url in self.index:
                 continue
+            if time.monotonic() - t0 > budget_s:
+                self._fail("refetch", TimeoutError(f"prazo de {budget_s:.0f}s esgotado"))
+                break
             try:
-                r = request.get(url, timeout=15_000)
+                r = request.get(url, timeout=10_000)
                 ctype = (r.headers or {}).get("content-type", "")
                 if r.ok and _is_candidate(ctype):
                     before = len(self.index)
@@ -364,12 +385,26 @@ def _open_context(cfg: CaptureConfig):
             if page is None:
                 raise RuntimeError("Aba nao abriu no Chrome local")
             if cfg.device == "mobile":
+                # o celular deixa cookies de versao (m.<site>) que mandariam o DESKTOP para o site de
+                # celular (Magalu 17/11/2026): guarda os cookies do site e devolve ao fechar a aba
                 try:
+                    snap = snapshot_site_cookies(lb.context, cfg.url)
                     cdp = emulate_mobile_tab(page, version)
                 except Exception:
                     page.close()
                     raise
                 page._shelfproof_cdp = cdp  # mantem a sessao CDP (e a emulacao) viva com a aba
+
+                def close_mobile() -> None:
+                    try:
+                        page.close()
+                    finally:
+                        try:
+                            restore_site_cookies(lb.context, cfg.url, snap)
+                        except Exception as exc:
+                            logger.warning(f"[capture] cookies do site nao voltaram ao estado do desktop: {exc}")
+
+                return lb.context, page, close_mobile
             else:
                 page.set_viewport_size(DEVICES["desktop"]["viewport"])
             return lb.context, page, page.close
@@ -439,7 +474,70 @@ def _human_scroll(page: Any, max_steps: int, stats: Optional[Dict[str, int]] = N
     return int(page.evaluate("document.documentElement.scrollHeight"))
 
 
-def _warm_up(page: Any, url: str, device: str = "desktop") -> Dict[str, Any]:
+def _site_domain(url: str) -> str:
+    """magazineluiza.com.br para www./m.magazineluiza.com.br."""
+    host = urlparse(url).netloc.lower().split(":")[0]
+    return re.sub(r"^(www|m)\.", "", host)
+
+
+def _is_mobile_site(final_url: str, asked_url: str) -> bool:
+    """O site mandou para a versao de celular (m.<dominio>) sem a gente ter pedido."""
+    fh, ah = urlparse(final_url).netloc.lower(), urlparse(asked_url).netloc.lower()
+    return fh.startswith("m.") and not ah.startswith("m.")
+
+
+def _cookie_matches(c: Dict[str, Any], base: str) -> bool:
+    d = (c.get("domain") or "").lstrip(".").lower()
+    return d == base or d.endswith("." + base)
+
+
+def _clear_site_cookies(context: Any, url: str) -> int:
+    """Apaga os cookies do site (perfil dedicado, nunca logado). Devolve quantos."""
+    base = _site_domain(url)
+    n = sum(1 for c in context.cookies() if _cookie_matches(c, base))
+    context.clear_cookies(domain=re.compile(r"(^|\.)" + re.escape(base) + r"$"))
+    _forget_warm(url)
+    return n
+
+
+_COOKIE_KEYS = ("name", "value", "domain", "path", "expires", "httpOnly", "secure", "sameSite")
+
+
+def snapshot_site_cookies(context: Any, url: str) -> List[Dict[str, Any]]:
+    base = _site_domain(url)
+    out = []
+    for c in context.cookies():
+        if _cookie_matches(c, base):
+            k = {key: c[key] for key in _COOKIE_KEYS if key in c}
+            if k.get("expires", 0) is not None and float(k.get("expires", 0)) < 0:
+                k.pop("expires", None)  # cookie de sessao
+            out.append(k)
+    return out
+
+
+def restore_site_cookies(context: Any, url: str, snap: List[Dict[str, Any]]) -> None:
+    """Volta os cookies do site ao que eram antes do celular (o desktop nao herda a versao m.)."""
+    base = _site_domain(url)
+    context.clear_cookies(domain=re.compile(r"(^|\.)" + re.escape(base) + r"$"))
+    if snap:
+        context.add_cookies(snap)
+    _forget_warm(url, devices=("mobile",))
+
+
+def _forget_warm(url: str, devices: tuple = ("desktop", "mobile")) -> None:
+    """Esquece que o site foi aquecido (o proximo uso aquece de novo)."""
+    try:
+        from shelfproof.browser.local_browser import get_local_browser
+
+        lb = get_local_browser()
+        host = urlparse(url).netloc
+        for d in devices:
+            lb._warmed_hosts.discard(f"{host}#{d}")
+    except Exception:
+        pass
+
+
+def _warm_up(page: Any, url: str, device: str = "desktop", force: bool = False) -> Dict[str, Any]:
     """Aquece a sessao na home do site (como o RAC): visita, mexe o mouse, rola e, em site
     com Akamai, espera o _abck validar. Devolve o que aconteceu, para o manifest."""
     from shelfproof.browser.local_browser import get_local_browser
@@ -448,6 +546,8 @@ def _warm_up(page: Any, url: str, device: str = "desktop") -> Dict[str, Any]:
     home = f"{u.scheme}://{u.netloc}/"
     akamai = any(h in u.netloc for h in AKAMAI_HOSTS)
     lb = get_local_browser()
+    if force:
+        _forget_warm(url, (device,))
     # o celular aquece de novo: o _abck validado com o UA do desktop nao vale para o do celular
     ok = bool(lb) and lb.warmup(page, home, wait_abck=akamai, host_key=f"{u.netloc}#{device}")
     info: Dict[str, Any] = {"home": home, "akamai": akamai, "ok": bool(ok), "device": device}
@@ -517,8 +617,11 @@ def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
                         hit = True
                         time.sleep(random.uniform(0.6, 1.2))
                     continue
-                for fr in _frames(page):
+                for j, fr in enumerate(_frames(page)):
                     loc = fr.get_by_role("button", name=pat)
+                    if j > 0 and loc.count() == 0:
+                        # dentro da janela o "botao" pode ser um div clicavel: texto EXATO, so no iframe
+                        loc = fr.get_by_text(pat)
                     done = False
                     for i in range(min(loc.count(), 3)):
                         b = loc.nth(i)
@@ -540,12 +643,27 @@ def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
 
 
 def _frames(page: Any) -> List[Any]:
-    """A pagina e os iframes dela (a pagina primeiro)."""
+    """A pagina e os iframes que podem ser uma janela por cima dela: grandes e na tela.
+
+    Nunca todos os iframes: pagina de marketplace tem dezenas (anuncios, rastreio), e consultar
+    um iframe que nao terminou de carregar pode demorar.
+    """
+    out: List[Any] = []
     try:
-        main = page.main_frame
-        return [main] + [f for f in page.frames if f is not main]
+        out.append(page.main_frame)
+        vp = page.viewport_size or {"width": 1440, "height": 900}
+        for h in page.query_selector_all("iframe")[:40]:
+            box = h.bounding_box()
+            if not box or box["width"] < 200 or box["height"] < 120:
+                continue
+            if box["y"] > vp["height"] or box["y"] + box["height"] < 0:
+                continue
+            fr = h.content_frame()
+            if fr is not None:
+                out.append(fr)
     except Exception:
-        return [page]
+        pass
+    return out or [page]
 
 
 def _looks_blocked(page: Any, n_imgs: int, http_status: Optional[int] = None) -> Optional[str]:
@@ -576,6 +694,18 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
     }
     sink = _ImageSink(run_dir / "images", cfg.min_image_bytes)
     marketplace = "generic"
+    # segundos gastos em cada etapa; "stage" = a ultima iniciada (se a captura for interrompida
+    # com Ctrl+C, o manifest diz onde parou)
+    timings: Dict[str, float] = {}
+    manifest["timings"] = timings
+    clock = {"name": "open", "t": time.monotonic()}
+
+    def stage(name: str) -> None:
+        now = time.monotonic()
+        timings[clock["name"]] = round(timings.get(clock["name"], 0) + now - clock["t"], 1)
+        clock.update(name=name, t=now)
+        manifest["stage"] = name
+
     blocked = False
 
     try:
@@ -592,12 +722,27 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             try:
                 if cfg.device == "mobile":
                     manifest["emulation"] = "cdp_tab"  # celular emulado na aba do perfil dedicado
+                stage("warmup")
                 manifest["warmup"] = _warm_up(page, cfg.url, cfg.device)
                 logger.info(f"[capture] aquecimento: {manifest['warmup']}")
             except Exception as exc:
                 errors.append(f"aquecimento: {exc}")
         page.on("response", sink.on_response)
+        http_errors: List[str] = []
+        manifest["http_errors"] = http_errors
+
+        def _on_err(r: Any) -> None:  # chamadas recusadas pelo site (vitrine vazia sem motivo aparente)
+            try:
+                if r.status >= 400 and len(http_errors) < 30 and \
+                        r.request.resource_type in ("document", "xhr", "fetch", "script"):
+                    u = urlparse(r.url)
+                    http_errors.append(f"{r.status} {r.request.resource_type} {u.netloc}{u.path[:80]}")
+            except Exception:
+                pass
+
+        page.on("response", _on_err)
         logger.info(f"[capture] {cfg.url} ({cfg.device}/{cfg.session})")
+        stage("goto")
         resp = page.goto(cfg.url, wait_until="domcontentloaded", timeout=60_000)
         http_status = resp.status if resp is not None else None
         manifest["http_status"] = http_status
@@ -606,13 +751,35 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         except Exception:
             pass  # home de marketplace raramente fica ociosa; seguir
         manifest["final_url"] = page.url
+        if cfg.session == "anon_warm" and cfg.device == "desktop" and _is_mobile_site(page.url, cfg.url):
+            # 17/11/2026: depois do celular no mesmo perfil, a Magalu mandou o DESKTOP para m.magazineluiza
+            # (cookie de versao). Limpa os cookies do site, aquece de novo como desktop e tenta outra vez.
+            logger.warning(f"[capture] desktop caiu no site de celular ({page.url}): limpando cookies do site")
+            stage("redirect_fix")
+            manifest["mobile_redirect_fixed"] = _clear_site_cookies(page.context, cfg.url)
+            try:
+                manifest["warmup_retry"] = _warm_up(page, cfg.url, cfg.device, force=True)
+                resp = page.goto(cfg.url, wait_until="domcontentloaded", timeout=60_000)
+                http_status = resp.status if resp is not None else None
+                manifest["http_status"] = http_status
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15_000)
+                except Exception:
+                    pass
+            except Exception as exc:
+                errors.append(f"redirect_fix: {exc}")
+            manifest["final_url"] = page.url
+            if _is_mobile_site(page.url, cfg.url):
+                errors.append(f"desktop redirecionado para o site de celular: {page.url}")
 
+        stage("overlays")
         # 0) janelas por cima da vitrine (idioma da Shopee, aviso de cookies): fechar como um cliente
         try:
             manifest["dismissed"] = dismiss_overlays(page)
         except Exception as exc:
             errors.append(f"overlays: {exc}")
 
+        stage("frames")
         # 1) carrossel: observar a 1a tela girando ANTES de rolar
         frames_dir = run_dir / "frames"
         frames_dir.mkdir(exist_ok=True)
@@ -631,6 +798,7 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             time.sleep(cfg.carousel_interval)
         manifest["frames"] = frames
 
+        stage("scroll")
         # 2) rolar ate o fim para carregar o lazy-load. Antes, fechar de novo: janela que carrega
         # por ultimo (pesquisa da Magalu, lazyOnload) aparece depois da 1a tentativa.
         try:
@@ -644,6 +812,7 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         except Exception as exc:
             errors.append(f"scroll: {exc}")
 
+        stage("artifacts")
         # 3) artefatos, cada um no seu try
         html = ""
         try:
@@ -663,15 +832,18 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             errors.append(f"full.jpg: {exc}")
 
         marketplace = identify_marketplace(html, page.url)
+        stage("images")
         # 4) criativos: corpos das respostas anotadas + o que faltou, buscado pelo endereco
         try:
-            sink.flush()
+            manifest["image_bodies"] = sink.flush()
+            stage("refetch")
             visible_srcs = [e["src"] for e in elements if e.get("w", 0) >= 120 and e.get("h", 0) >= 60]
             refetched = sink.fetch_missing(ctx.request, visible_srcs)
             manifest["images_refetched"] = refetched
         except Exception as exc:
             errors.append(f"images: {exc}")
 
+        stage("done")
         reason = _looks_blocked(page, len(elements), http_status)
         if reason:
             blocked = True
@@ -686,6 +858,7 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             (run_dir / "images.json").write_text(json.dumps(sink.index, ensure_ascii=False, indent=0), encoding="utf-8")
         except Exception as exc:
             errors.append(f"images.json: {exc}")
+        stage("end")
         manifest.update(marketplace=marketplace, blocked=blocked, errors=errors,
                         images_saved=len(sink.index), finished_at=now_brt().isoformat())
         (run_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

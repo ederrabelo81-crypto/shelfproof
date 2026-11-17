@@ -155,3 +155,16 @@ antes de rolar; `_human_scroll` rola por script quando a roda não mexe (`manife
 **Errado:** criar o venv com o primeiro Python 3 do PC: era 3.14 **32 bits**, o `greenlet` não
 tinha pacote pronto e pediu o compilador C++. **Certo:** `scripts\instalar.bat` só aceita 64 bits
 (prefere 3.13) e recria o `.venv` se ele for de 32 bits.
+
+### S19. Celular e desktop no mesmo perfil (Magalu, 17/11/2026)
+**Errado:** depois da captura do celular no perfil dedicado, o **desktop** da Magalu abriu em
+`m.magazineluiza.com.br` (cookie de versão), vazio. **Certo:** o celular `anon_warm` guarda os
+cookies do site antes e devolve ao fechar a aba (`snapshot_site_cookies`/`restore_site_cookies`);
+se o desktop ainda cair em `m.`, a captura limpa os cookies do site, aquece de novo e tenta outra vez
+(`manifest.mobile_redirect_fixed`).
+
+### S20. `response.body()` sem tempo limite (17/11/2026)
+**Errado:** ler o corpo de toda resposta de imagem anotada: numa resposta que nunca termina, a
+captura da Magalu ficou 17 min parada. **Certo:** `flush()` só lê resposta terminada
+(`request.timing.responseEnd`) e tem prazo; `fetch_missing()` tem prazo. O manifest guarda
+`timings` (segundos por etapa) e `stage` (onde parou, se interromper com Ctrl+C).
