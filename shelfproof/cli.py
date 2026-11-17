@@ -100,6 +100,20 @@ def _cmd_event(a: argparse.Namespace) -> int:
 
     day = parse_date(a.date) if a.date else now_brt().date()
     sdir = day_dir(Path(a.out), day)
+    if a.list:
+        from shelfproof.rounds import list_day
+
+        rows = list_day(sdir)
+        if not rows:
+            print("Nenhuma rodada registrada neste dia")
+            return 2
+        print(f"Capturas de {day.strftime('%d/%m/%Y')} (exclude_runs no review.json tira uma do dia):")
+        for r in rows:
+            st = "FORA" if r["excluded"] else ("BLOQ" if r["blocked"] else ("ok" if r["ok"] else "falha"))
+            emu = r["emulation"].replace("cdp_tab:", "") if r["emulation"] else ""
+            print(f"  R{r['round']:<2} {r['time']:5} {st:5} {r['site']:13} {r['device']:7} {emu:8} "
+                  f"{r['pieces']:3} pecas {r['paid']:3} pagas  {str(r['page_height'] or ''):>6}px  {r['run']}")
+        return 0
     if a.rebuild:
         out = build_day(sdir, a.event, devices=_devices(a.showroom_device))
         print(out if out else "Nenhuma rodada registrada neste dia")
@@ -251,6 +265,7 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--only", default="", help="so estes alvos, pelo nome: \"Magalu,Casas Bahia\"")
     c.add_argument("--showroom-device", choices=["desktop", "mobile", "both"], default="both")
     c.add_argument("--carousel", type=float, default=24.0, help="segundos observando a 1a tela")
+    c.add_argument("--list", action="store_true", help="nao captura: lista as capturas do dia (para exclude_runs)")
     c.add_argument("--rebuild", action="store_true",
                    help="nao captura: so refaz o Showroom do dia (ex.: depois do review.json)")
     c.add_argument("--out", default="runs")

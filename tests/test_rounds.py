@@ -228,3 +228,19 @@ def test_showroom_avisa_celular_so_com_tela(tmp_path):
     build_from_runs(rd, out, "E", "17/11/2026")
     notes = json.loads((out / "data.json").read_text(encoding="utf-8"))["context"]["method_notes"]
     assert any("Celular em Mercado Livre" in n and "desktop" in n for n in notes)
+
+
+def test_exclude_runs_tira_captura_de_teste_do_dia(tmp_path):
+    from shelfproof.rounds import list_day
+
+    runs = _day(tmp_path)
+    sdir = tmp_path / "showroom" / "2026-11-17"
+    add_round(sdir, datetime(2026, 11, 17, 9, tzinfo=BRT),
+              [{"site": "Mercado Livre", "device": "desktop", "ok": True, "run_dir": str(r)} for r in runs[:2]])
+    (sdir / "review.json").write_text(json.dumps({"exclude_runs": [runs[1].name]}), encoding="utf-8")
+    assert day_run_dirs(sdir) == [runs[0]]
+    rows = list_day(sdir)
+    assert [r["excluded"] for r in rows] == [False, True] and rows[0]["paid"] == 1
+    build_day(sdir)
+    data = json.loads((sdir / "data.json").read_text(encoding="utf-8"))["data"]
+    assert data["rounds"] == {"ml": {"desktop": 1}}

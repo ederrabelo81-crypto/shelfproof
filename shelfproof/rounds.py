@@ -8,6 +8,7 @@ refeito a cada rodada somando todas: a mesma peca vista em varias rodadas vira u
     runs/showroom/2026-11-17/
       rounds.json        [{"round": 1, "started_at": ..., "event": ..., "runs": [{site, device, ok, run_dir...}]}]
       review.json        (opcional) {"exclude": ["ml_04", "ml_m_02"]} depois da folha de contato
+                         e {"exclude_runs": ["<pasta da captura>", ...]} para tirar capturas do dia (testes)
       index.html img/ logo/ data.json
 """
 from __future__ import annotations
@@ -56,6 +57,43 @@ def add_round(sdir: Path, started: datetime, runs: List[Dict[str, Any]], event: 
     return n
 
 
+def _excluded_runs(sdir: Path) -> List[str]:
+    """review.json -> "exclude_runs": nomes das pastas de captura que nao contam no dia (testes, capturas quebradas)."""
+    f = Path(sdir) / "review.json"
+    if not f.exists():
+        return []
+    try:
+        return [str(x).strip() for x in json.loads(f.read_text(encoding="utf-8")).get("exclude_runs", []) if str(x).strip()]
+    except Exception as exc:
+        logger.warning(f"review.json ilegivel: {exc}")
+        return []
+
+
+def list_day(sdir: Path) -> List[Dict[str, Any]]:
+    """Uma linha por captura do dia, para decidir o que vai para exclude_runs."""
+    out: List[Dict[str, Any]] = []
+    excluded = set(_excluded_runs(sdir))
+    for r in load_rounds(sdir):
+        for row in r.get("runs", []):
+            rd = Path(row.get("run_dir", ""))
+            man, pieces = {}, []
+            try:
+                man = json.loads((rd / "manifest.json").read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            try:
+                pieces = json.loads((rd / "pieces.json").read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            out.append({"round": r.get("round"), "run": rd.name, "site": row.get("site", ""), "device": row.get("device", ""),
+                        "time": (man.get("collected_at") or "")[11:16], "emulation": man.get("emulation", ""),
+                        "final_url": man.get("final_url", ""), "page_height": man.get("page_height"),
+                        "pieces": len(pieces), "paid": sum(1 for p in pieces if p.get("ownership") == "paid"),
+                        "ok": bool(row.get("ok")) or bool(pieces), "blocked": bool(row.get("blocked")),
+                        "excluded": rd.name in excluded})
+    return out
+
+
 def day_run_dirs(sdir: Path, devices: Optional[List[str]] = None) -> List[Path]:
     """Capturas uteis de todas as rodadas do dia: nao bloqueadas e com pieces.json.
 
@@ -63,8 +101,11 @@ def day_run_dirs(sdir: Path, devices: Optional[List[str]] = None) -> List[Path]:
     (ex.: faltou o lxml no PC, 17/11/2026) entra depois de ``shelfproof analyze <pasta>``.
     """
     out: List[Path] = []
+    excluded = set(_excluded_runs(sdir))
     for r in load_rounds(sdir):
         for row in r.get("runs", []):
+            if Path(row.get("run_dir", "")).name in excluded:
+                continue
             if row.get("blocked") or not row.get("run_dir") or (devices and row.get("device") not in devices):
                 continue
             rd = Path(row["run_dir"])

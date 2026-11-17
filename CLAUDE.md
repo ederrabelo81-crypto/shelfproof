@@ -96,7 +96,7 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 73 testes; os e2e pulam sem Chrome
+pytest -q                                   # 79 testes; os e2e pulam sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
@@ -119,6 +119,7 @@ python -m shelfproof event --event "Black Friday"           # nome no Showroom
 python -m shelfproof event --only "Magalu,Casas Bahia" --devices mobile
 python -m shelfproof contact-sheet runs/showroom/2026-11-17 # revisar; review.json na mesma pasta
 python -m shelfproof event --rebuild                        # refaz o dia sem capturar
+python -m shelfproof event --list                           # capturas do dia; teste/quebrada -> review.json "exclude_runs"
 ```
 
 Windows (PC coletor): `scripts\instalar.bat` uma vez (venv próprio, não o do RAC — COMMON_MISTAKES S16).
