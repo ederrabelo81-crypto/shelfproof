@@ -741,6 +741,35 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
                 pass
 
         page.on("response", _on_err)
+        # diagnostico da vitrine vazia (Magalu celular 17/11/2026: caixas lazyload nunca preenchidas,
+        # sem nenhuma chamada recusada): erros de JavaScript e as chamadas de conteudo que a pagina fez
+        js_errors: List[str] = []
+        api_calls: List[str] = []
+        manifest["js_errors"] = js_errors
+        manifest["api_calls"] = api_calls
+
+        def _on_pageerror(e: Any) -> None:
+            if len(js_errors) < 15:
+                js_errors.append(f"pageerror: {str(e)[:200]}")
+
+        def _on_console(m: Any) -> None:
+            try:
+                if m.type == "error" and len(js_errors) < 15:
+                    js_errors.append(f"console: {m.text[:200]}")
+            except Exception:
+                pass
+
+        def _on_api(r: Any) -> None:
+            try:
+                if r.request.resource_type in ("xhr", "fetch") and len(api_calls) < 60:
+                    u = urlparse(r.url)
+                    api_calls.append(f"{r.status} {u.netloc}{u.path[:90]}")
+            except Exception:
+                pass
+
+        page.on("pageerror", _on_pageerror)
+        page.on("console", _on_console)
+        page.on("response", _on_api)
         logger.info(f"[capture] {cfg.url} ({cfg.device}/{cfg.session})")
         stage("goto")
         resp = page.goto(cfg.url, wait_until="domcontentloaded", timeout=60_000)
