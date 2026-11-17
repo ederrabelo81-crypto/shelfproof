@@ -6,6 +6,7 @@ Gera uma pasta ``runs/<data>/<marketplace>_<device>_<sessao>_<HHMM>/`` com:
     manifest.json   URL, horario (BRT), dispositivo, sessao, altura, erros
     page.html       DOM renderizado depois da rolagem (entrada do detector)
     elements.json   toda <img>: src real, alt, link, caixa na pagina, rotulos
+    slots.json      caixa dos espacos de anuncio sem <img> (Amazon adplacements), para recortar do full.jpg
     full.jpg        print da pagina inteira
     frames/         prints da 1a tela a cada N s (rotacao do carrossel)
     images/         bytes das imagens que o navegador baixou (o criativo real)
@@ -138,6 +139,22 @@ ELEMENTS_JS = r"""
       on_top: null, label: '', slot_id: '', background: true,
     });
   });
+  return out;
+}
+"""
+
+
+# Caixa (pagina inteira, px CSS) de cada espaco de anuncio marcado por atributo, com ou sem <img>
+SLOTS_JS = r"""
+() => {
+  const out = [];
+  const sel = '[data-csa-c-slot-id^="adplacements"]';
+  for (const el of document.querySelectorAll(sel)) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 40 || r.height < 30) continue;
+    out.push({id: el.getAttribute('data-csa-c-slot-id'), x: r.left + window.scrollX, y: r.top + window.scrollY,
+              w: r.width, h: r.height, iframe: !!el.querySelector('iframe')});
+  }
   return out;
 }
 """
@@ -940,6 +957,13 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             (run_dir / "elements.json").write_text(json.dumps(elements, ensure_ascii=False), encoding="utf-8")
         except Exception as exc:
             errors.append(f"elements.json: {exc}")
+        try:
+            # caixas dos espacos de anuncio sem <img> (Amazon adplacements: o criativo vem num iframe).
+            # O pipeline recorta o criativo do full.jpg por essas caixas (17/11/2026).
+            slots = page.evaluate(SLOTS_JS)
+            (run_dir / "slots.json").write_text(json.dumps(slots, ensure_ascii=False), encoding="utf-8")
+        except Exception as exc:
+            errors.append(f"slots.json: {exc}")
         try:
             page.screenshot(path=str(run_dir / "full.jpg"), full_page=True, type="jpeg", quality=70)
         except Exception as exc:

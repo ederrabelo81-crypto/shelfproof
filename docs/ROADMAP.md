@@ -9,7 +9,7 @@ Data-alvo: **Black Friday, 27/11/2026**. Primeira validação de campo no PC col
 | 2 · Campo | Rodar `capture` nas 6 homes reais, desktop + mobile, sem login | 6×2 capturas com `ok=true`; regras ajustadas para o HTML **renderizado** e para o **mobile** | ⬜ até 18/11 |
 | 3 · Visão | Anunciante pela imagem quando o HTML não diz (displays Amazon/ML, Sponsored Brands) | ≥ 80% dos `Nao identificado` resolvidos, com a evidência "lido na imagem", e **nenhuma marca errada** (`vision-eval`) | ✅ 12/11: 17/19 certas, 0 erradas (89,5%) |
 | 4 · Evento | Rodadas do dia (`event` à mão; depois agendado a cada 1 h); rotação e tempo no ar ao longo do dia | Showroom da BF com desktop × mobile e tempo no ar | 🟡 17/11: rodadas + celular no código; falta validar no PC e agendar |
-| 5 · Prova | Recorte do slot no print + PDF de evidência por anunciante | PDF de uma marca pronto para enviar | ⬜ dez/26 |
+| 5 · Prova | Recorte do slot no print + PDF de evidência por anunciante | PDF de uma marca pronto para enviar | 🟡 17/11: recorte dos displays em iframe (Amazon); falta o PDF |
 | 6 · Jornada | Home → categoria → busca → produto; funil de exposição | 1 jornada roteirizada por site | ⬜ dez/26 |
 | 7 · Produto | Histórico por evento, comparação entre datas, multi-cliente | Portal ou relatório recorrente | ⬜ 2027 |
 

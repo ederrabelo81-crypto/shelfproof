@@ -195,3 +195,10 @@ domínio do site (`urljoin`) antes de casar, e desconfiar de "OK, 0 peças" num 
 antes; sozinha, abriu normal. **Certo:** nunca resolver captcha (regra 13). O `event` tenta **uma vez**
 de novo, no fim da rodada e depois de 60–120 s, o que deu bloqueio; o bloqueio fica registrado
 (`rounds.json`, `retry`). Se continuar, decidir com o dono se a Shopee entra no `anon_warm`.
+
+### S25. Anúncio em iframe sem imagem (Amazon celular, 17/11/2026)
+**Errado:** esperar `<img>` em todo espaço pago: os displays `adplacements:*` da Amazon vêm num iframe,
+e 6 de 8 pagas "Nao identificado" ficaram sem imagem (sem Showroom, sem leitura visual). **Certo:** a
+captura grava a caixa de cada espaço (`slots.json`) e o pipeline recorta o criativo do `full.jpg`
+(`extra.image_source = "recorte do print da pagina"`); caixa em branco não vira criativo. Também:
+link `/ap/signin` nunca é destino de anúncio (o card "Patrocinado" pegava o login do bloco ao lado).

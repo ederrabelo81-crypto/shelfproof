@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections import defaultdict
@@ -109,6 +110,11 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
         if "image_file" not in p.extra and p.img_src and _src_key(p.img_src) in img_by_srckey:
             p.extra["image_file"] = img_by_srckey[_src_key(p.img_src)]
 
+    # espaco pago sem imagem com caixa conhecida (Amazon adplacements em iframe): recorta do print
+    _crop_slots(pieces, run_dir, manifest, _load_json(run_dir / "slots.json", []), vh)
+    # a mesma peca contada duas vezes (mesmo link, mesma imagem, mesma caixa): fica uma
+    pieces = _drop_exact_duplicates(pieces)
+
     # tempo no ar na 1a tela: em quantos frames do carrossel a peca estava visivel
     frames = manifest.get("frames") or []
     if frames:
@@ -135,6 +141,64 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
     (run_dir / "summary.json").write_text(
         json.dumps(summarize(pieces), ensure_ascii=False, indent=1), encoding="utf-8")
     return pieces
+
+
+def _crop_slots(pieces: List[Piece], run_dir: Path, manifest: Dict[str, Any], slots: List[Dict[str, Any]],
+                vh: float) -> int:
+    """Recorta do full.jpg o criativo de cada espaco pago sem imagem cuja caixa a captura gravou.
+
+    Amazon celular 17/11/2026: 4 displays adplacements sem <img> (o anuncio vem num iframe), logo sem
+    imagem para o Showroom nem para a leitura visual. O print da pagina mostra o criativo.
+    """
+    if not slots:
+        return 0
+    todo = [p for p in pieces if p.is_paid and "image_file" not in p.extra]
+    if not todo:
+        return 0
+    try:
+        from PIL import Image, ImageStat
+
+        full = Image.open(run_dir / "full.jpg").convert("RGB")
+    except Exception:
+        return 0
+    vw = float((manifest.get("viewport") or {}).get("width") or 0) or float(full.width)
+    scale = full.width / vw
+    done = 0
+    for p in todo:
+        slot = next((s for s in slots if s.get("id") and any(s["id"] in e for e in p.evidence)), None)
+        if slot is None:
+            continue
+        box = (max(0, int(slot["x"] * scale)), max(0, int(slot["y"] * scale)),
+               min(full.width, int((slot["x"] + slot["w"]) * scale)), min(full.height, int((slot["y"] + slot["h"]) * scale)))
+        if box[2] - box[0] < 60 or box[3] - box[1] < 40:
+            continue
+        crop = full.crop(box)
+        if max(ImageStat.Stat(crop).stddev) < 6:  # caixa vazia (anuncio que nao carregou): nao e criativo
+            continue
+        name = "crop_" + hashlib.sha1(slot["id"].encode()).hexdigest()[:16] + ".jpg"
+        (run_dir / "images").mkdir(exist_ok=True)
+        crop.save(run_dir / "images" / name, "JPEG", quality=88)
+        p.extra["image_file"] = name
+        p.extra["image_source"] = "recorte do print da pagina"
+        p.evidence.append("imagem recortada do print da pagina pela caixa do espaco (anuncio em iframe)")
+        if p.bbox is None:
+            p.bbox = BBox(slot["x"], slot["y"], slot["w"], slot["h"], viewport_h=vh)
+        done += 1
+    return done
+
+
+def _drop_exact_duplicates(pieces: List[Piece]) -> List[Piece]:
+    """Mesma peca duas vezes na mesma caixa (Amazon celular 17/11/2026: dois cards identicos).
+    Duas posicoes diferentes continuam duas pecas (S4): so cai o que tem caixa, link e imagem iguais."""
+    seen, out = set(), []
+    for p in pieces:
+        if p.bbox is not None:
+            key = (p.ownership, p.href, p.img_src[:200], round(p.bbox.x), round(p.bbox.y), round(p.bbox.w), round(p.bbox.h))
+            if key in seen:
+                continue
+            seen.add(key)
+        out.append(p)
+    return out
 
 
 def summarize(pieces: List[Piece]) -> Dict[str, Any]:

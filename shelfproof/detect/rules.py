@@ -224,7 +224,10 @@ def _amazon(soup: BeautifulSoup) -> List[Piece]:
             if card is None or card.parent is None:
                 break
             card = card.parent
-            links = [x.get("href", "") for x in card.find_all("a") if x.get("href")]
+            # link de login nunca e destino de anuncio (Amazon celular 17/11/2026: o card "Patrocinado"
+            # pegava o /ap/signin do bloco ao lado e virava duas pecas iguais sem imagem)
+            links = [x.get("href", "") for x in card.find_all("a")
+                     if x.get("href") and "/ap/signin" not in x.get("href", "")]
             if links:
                 break
         if card is None:

@@ -126,3 +126,15 @@ def test_shopee_17_11_links_relativos_e_rotulo_anuncio():
     assert not any("/oficial" in p.href or "signup" in p.href for p in ps if p.is_paid)
     camp = [p for p in ps if p.ownership == "marketplace"]
     assert [p.href for p in camp] == ["https://shopee.com.br/m/especial-black-friday"]
+
+
+def test_amazon_patrocinado_nao_pega_link_de_login():
+    from shelfproof.detect.rules import detect
+
+    html = """<html><head><title>Amazon.com.br</title></head><body><div id="bloco">
+      <div><a href="https://www.amazon.com.br/ap/signin?openid.mode=checkid_setup">Entrar</a></div>
+      <div class="card"><span>Patrocinado</span></div>
+      <div><a href="https://www.amazon.com.br/Shampoo-Elseve/dp/B07H113TPQ"><img src="https://m.media-amazon.com/x.jpg" alt="Imagem do produto"></a></div>
+    </div></body></html>"""
+    ps = [p for p in detect(html, "https://www.amazon.com.br/") if p.is_paid]
+    assert ps and all("/ap/signin" not in p.href for p in ps)
