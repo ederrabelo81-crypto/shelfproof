@@ -129,7 +129,8 @@ def _cmd_event(a: argparse.Namespace) -> int:
             session = t.get("session", "anon")
             try:
                 res = capture(CaptureConfig(url=t["url"], device=dev, session=session, out_root=Path(a.out),
-                                            carousel_seconds=a.carousel))
+                                            carousel_seconds=a.carousel,
+                                            mobile_emulation=t.get("mobile_emulation", "")))
             except Exception as exc:  # um site nao derruba a rodada
                 logger.error(f"{t['url']} ({dev}): {exc}")
                 done.append({"site": t["name"], "device": dev, "ok": False, "error": str(exc)})

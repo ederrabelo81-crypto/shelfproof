@@ -168,3 +168,12 @@ se o desktop ainda cair em `m.`, a captura limpa os cookies do site, aquece de n
 captura da Magalu ficou 17 min parada. **Certo:** `flush()` só lê resposta terminada
 (`request.timing.responseEnd`) e tem prazo; `fetch_missing()` tem prazo. O manifest guarda
 `timings` (segundos por etapa) e `stage` (onde parou, se interromper com Ctrl+C).
+
+### S21. Celular com identidade de Android na Magalu (17/11/2026)
+**Errado:** emular o celular com UA e client hints de Android: a home abria, mas as consultas de
+conteúdo (`federation.magazineluiza.com.br/graphql`: `showcaseQuery`, `adsItemsQuery`...) eram
+barradas por **CORS** e todas as vitrines ficavam vazias (1962 px, 9 imagens). No navegador à mão,
+com a janela estreita, vinha completa. **Certo:** na Magalu, `"mobile_emulation": "viewport"` no
+`targets.json`: tela 412 px e toque de celular, navegador se apresentando como desktop (6535 px,
+49 imagens, graphql 200). O Showroom avisa na metodologia. Teste A/B: `scripts\teste_celular_magalu.bat`.
+**Ainda conferir:** se os slots pagos dessa tela são os de celular (`msite_...`) ou os de desktop (`desk_...`).

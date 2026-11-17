@@ -156,6 +156,7 @@ class CaptureConfig:
     max_scroll_steps: int = 40
     min_image_bytes: int = 4_000       # ignora icones/pixels de rastreio
     headless: bool = False             # so vale para engine=launch
+    mobile_emulation: str = ""         # celular anon_warm: full | no_lang | viewport ("" = variavel de ambiente ou full)
 
 
 @dataclass
@@ -349,6 +350,16 @@ def mobile_emulation_mode() -> str:
     return m if m in MOBILE_EMULATION_MODES else "full"
 
 
+def _emulation_mode(cfg: "CaptureConfig") -> str:
+    """Modo do alvo (targets.json "mobile_emulation"); a variavel de ambiente vale para testes A/B."""
+    import os
+
+    if os.environ.get("SHELFPROOF_MOBILE_EMULATION"):
+        return mobile_emulation_mode()
+    m = (cfg.mobile_emulation or "").strip().lower()
+    return m if m in MOBILE_EMULATION_MODES else "full"
+
+
 def emulate_mobile_tab(page: Any, chrome_version: str = "", mode: str = "") -> Any:
     """Celular numa aba do perfil dedicado (anon_warm): tela, toque, UA e client hints pelo CDP.
 
@@ -407,7 +418,7 @@ def _open_context(cfg: CaptureConfig):
                 # celular (Magalu 17/11/2026): guarda os cookies do site e devolve ao fechar a aba
                 try:
                     snap = snapshot_site_cookies(lb.context, cfg.url)
-                    cdp = emulate_mobile_tab(page, version)
+                    cdp = emulate_mobile_tab(page, version, mode=_emulation_mode(cfg))
                 except Exception:
                     page.close()
                     raise
@@ -740,7 +751,7 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             try:
                 if cfg.device == "mobile":
                     # celular emulado na aba do perfil dedicado; o modo vai junto (viewport = UA de desktop)
-                    manifest["emulation"] = f"cdp_tab:{mobile_emulation_mode()}"
+                    manifest["emulation"] = f"cdp_tab:{_emulation_mode(cfg)}"
                 stage("warmup")
                 manifest["warmup"] = _warm_up(page, cfg.url, cfg.device)
                 logger.info(f"[capture] aquecimento: {manifest['warmup']}")

@@ -1,9 +1,9 @@
 {
-  "_comment": "Homes monitoradas em datas quentes. devices: desktop e/ou mobile. session: anon (contexto limpo, padrao) ou anon_warm (perfil dedicado nunca logado, aquecido; no celular a aba e emulada pelo CDP) para sites com Akamai.",
+  "_comment": "Homes monitoradas em datas quentes. devices: desktop e/ou mobile. session: anon (contexto limpo, padrao) ou anon_warm (perfil dedicado nunca logado, aquecido; no celular a aba e emulada pelo CDP) para sites com Akamai. mobile_emulation (so celular anon_warm): full (UA Android, padrao) ou viewport (tela e toque de celular, navegador de desktop: Magalu, 17/11/2026, porque com UA Android as vitrines eram barradas por CORS).",
   "targets": [
     {"name": "Amazon",        "url": "https://www.amazon.com.br/",          "devices": ["desktop", "mobile"]},
     {"name": "Mercado Livre", "url": "https://www.mercadolivre.com.br/",    "devices": ["desktop", "mobile"]},
-    {"name": "Magalu",        "url": "https://www.magazineluiza.com.br/",   "devices": ["desktop", "mobile"], "session": "anon_warm"},
+    {"name": "Magalu",        "url": "https://www.magazineluiza.com.br/",   "devices": ["desktop", "mobile"], "session": "anon_warm", "mobile_emulation": "viewport"},
     {"name": "Casas Bahia",   "url": "https://www.casasbahia.com.br/",      "devices": ["desktop", "mobile"], "session": "anon_warm"},
     {"name": "Shopee",        "url": "https://shopee.com.br/",              "devices": ["desktop", "mobile"]},
     {"name": "Loja Midea",    "url": "https://www.midea.com.br/",           "devices": ["desktop", "mobile"]}

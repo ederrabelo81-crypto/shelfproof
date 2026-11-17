@@ -217,3 +217,14 @@ def test_modo_viewport_so_muda_a_tela():
     finally:
         browser.close()
         playwright_runtime.release()
+
+
+def test_showroom_avisa_celular_so_com_tela(tmp_path):
+    rd = _day(tmp_path)
+    man = json.loads((rd[2] / "manifest.json").read_text(encoding="utf-8"))
+    man["emulation"] = "cdp_tab:viewport"
+    (rd[2] / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
+    out = tmp_path / "sr"
+    build_from_runs(rd, out, "E", "17/11/2026")
+    notes = json.loads((out / "data.json").read_text(encoding="utf-8"))["context"]["method_notes"]
+    assert any("Celular em Mercado Livre" in n and "desktop" in n for n in notes)

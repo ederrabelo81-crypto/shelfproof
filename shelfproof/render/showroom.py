@@ -36,7 +36,7 @@ DARK_LOGOS_DEFAULT = {"samsung", "intel", "acer", "apple", "neutrogena"}
 
 
 def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[str], excluded: int = 0,
-                 n_rounds: int = 1, window: str = "") -> List[str]:
+                 n_rounds: int = 1, window: str = "", viewport_only: Optional[List[str]] = None) -> List[str]:
     """Como a leitura foi feita, dito com as condicoes REAIS de cada coleta (manifest.session)."""
     clean = [s for s, v in sessions.items() if v == "anon"]
     warm = [s for s, v in sessions.items() if v == "anon_warm"]
@@ -49,7 +49,11 @@ def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[st
                      f"antibot): {', '.join(warm)}. Vitrines \"com base nas suas visualizações\" refletem esse perfil.")
     if logged:
         notes.append(f"Sessão logada (persona, vitrine personalizada): {', '.join(logged)}.")
-    notes.append("Mídia paga só com marcador concreto na página (rótulo, código de slot ou parâmetro de anúncio); "
+    if viewport_only:
+        notes.append(f"Celular em {', '.join(viewport_only)}: tela e toque de celular, com o navegador se "
+                     "apresentando como desktop (com a identificação de Android as vitrines não carregavam). "
+                     "O layout é o do celular; os anúncios podem ser os que o site escolhe para desktop.")
+        notes.append("Mídia paga só com marcador concreto na página (rótulo, código de slot ou parâmetro de anúncio); "
                  "anunciante sem nome na página fica \"Não identificado\" ou é lido na própria peça.")
     notes.append("Espaços pagos sem imagem salva entram no ranking e aparecem na prova como registro de código.")
     if empty_sites:
@@ -136,6 +140,7 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
     extras: List[Dict[str, Any]] = []
     sites: List[str] = []
     rounds_by: Dict[str, Dict[str, int]] = {}
+    viewport_only: set = set()
     times: List[str] = []
     order = sorted(groups, key=lambda kd: (min(r["manifest"].get("collected_at", "") for r in groups[kd]),
                                            kd[1] != "desktop"))
@@ -147,6 +152,8 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
             sites.append(style["name"])
         rounds_by.setdefault(key, {})[dev] = len(runs)
         for r in runs:
+            if dev == "mobile" and str(r["manifest"].get("emulation", "")).endswith(":viewport"):
+                viewport_only.add(style["name"])
             sessions[style["name"] + (f" ({'celular' if dev == 'mobile' else 'desktop'})" if multi_dev else "")] = \
                 r["manifest"].get("session", "anon")
             times.append(r["manifest"].get("collected_at", ""))
@@ -232,7 +239,7 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
         sites_text=", ".join(sites[:-1]) + (" e " + sites[-1] if len(sites) > 1 else (sites[0] if sites else "")),
         method_notes=method_notes(date_label, sessions, [m["name"] for k, m in mkts.items()
                                                        if not any(p["m"] == k for p in pieces)], len(excluded),
-                                  n_rounds=n_rounds, window=window),
+                                  n_rounds=n_rounds, window=window, viewport_only=sorted(viewport_only)),
     )
     (out_dir / "data.json").write_text(json.dumps(dict(context=context, data=data), ensure_ascii=False, indent=1),
                                        encoding="utf-8")

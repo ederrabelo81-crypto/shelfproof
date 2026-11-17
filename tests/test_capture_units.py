@@ -325,3 +325,19 @@ def test_cookies_do_site_voltam_ao_estado_do_desktop():
         browser.close()
     finally:
         playwright_runtime.release()
+
+
+def test_modo_de_emulacao_vem_do_alvo_e_a_variavel_manda_no_teste(monkeypatch):
+    import json
+
+    from shelfproof.collect.capture import CaptureConfig, _emulation_mode
+
+    monkeypatch.delenv("SHELFPROOF_MOBILE_EMULATION", raising=False)
+    assert _emulation_mode(CaptureConfig(url="x")) == "full"
+    assert _emulation_mode(CaptureConfig(url="x", mobile_emulation="viewport")) == "viewport"
+    assert _emulation_mode(CaptureConfig(url="x", mobile_emulation="qualquer")) == "full"
+    monkeypatch.setenv("SHELFPROOF_MOBILE_EMULATION", "no_lang")
+    assert _emulation_mode(CaptureConfig(url="x", mobile_emulation="viewport")) == "no_lang"
+    targets = json.loads((Path(__file__).resolve().parents[1] / "config" / "targets.json").read_text(encoding="utf-8"))
+    modes = {t["name"]: t.get("mobile_emulation") for t in targets["targets"]}
+    assert modes["Magalu"] == "viewport"  # 17/11/2026: com UA Android a vitrine era barrada por CORS
