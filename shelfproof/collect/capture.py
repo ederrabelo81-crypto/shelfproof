@@ -607,6 +607,14 @@ OVERLAY_BUTTONS = [
 # no seletor de idioma do cabecalho, que nao deve ser clicado.
 OVERLAY_TEXTS = [re.compile(r"^\s*portugu[eê]s\s*\(br\)\s*$", re.I)]
 LANGUAGE_DIALOG = re.compile(r"selecione seu idioma", re.I)
+LANGUAGE_PATTERN = re.compile(r"^\s*portugu[eê]s\s*\(br\)\s*$", re.I)
+
+
+def _language_dialog_open(page: Any) -> bool:
+    try:
+        return bool(page.get_by_text(LANGUAGE_DIALOG).first.is_visible())
+    except Exception:
+        return False
 
 
 def _click_language_option(page: Any, pat: Any) -> str:
@@ -643,6 +651,10 @@ def dismiss_overlays(page: Any, passes: int = 2, skip: Iterable[str] = ()) -> Li
         for kind, pat in targets:
             try:
                 if any(pat.match(d) for d in done):
+                    continue
+                if pat.pattern == LANGUAGE_PATTERN.pattern and not _language_dialog_open(page):
+                    # Shopee 17/11/2026: o seletor de idioma do CABECALHO virou botao "Portugues (BR)";
+                    # clicar nele abre o menu por cima da vitrine. So vale dentro da janela de escolha.
                     continue
                 if kind == "text":
                     name = _click_language_option(page, pat)

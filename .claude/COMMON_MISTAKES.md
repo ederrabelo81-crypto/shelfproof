@@ -184,3 +184,8 @@ só viriam com UA Android, que hoje esbarra no CORS.
 **Errado:** `\btcl\b` não acha "tcl" em `tcl_tv_blackfriday26` (o `_` conta como letra para o `\b`),
 e o banner do slot `desk_hypertop_Ads_small` virou campanha da Magalu. **Certo:** em marca que
 aparece em slug, `(?<![a-z0-9])tcl(?![a-z0-9])`.
+
+### S23. Regra presa ao domínio no link (Shopee, 17/11/2026)
+**Errado:** exigir `shopee.com.br/m/` no `href`: a Shopee passou a usar links relativos (`/m/...`,
+`/shop/<id>`) e a home inteira deu **0 peças**, sem erro nenhum. **Certo:** resolver o link contra o
+domínio do site (`urljoin`) antes de casar, e desconfiar de "OK, 0 peças" num site que tinha peças.

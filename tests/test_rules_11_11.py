@@ -99,3 +99,30 @@ def test_loja_da_marca_nunca_tem_midia_paga(pieces):
     ps = pieces["midea"]
     assert ps and all(p.ownership == "brand_store" for p in ps)
     assert collections.Counter(p.slot for p in ps)["banner_tv"] >= 8
+
+
+# Shopee 17/11/2026: links relativos e rotulo "Anuncio." no texto da peca (home renderizada, desktop)
+SHOPEE_17_11 = """<html><head><title>Shopee Brasil</title></head><body>
+<a href="/m/especial-black-friday"><img alt="Prepare-se para a Black Friday Shopee. Frete grátis, confira" src="https://down-br.img.susercontent.com/file/a"></a>
+<a href="/shop/1311725041"><img alt="Anúncio. Lojas Oficiais Podium. Acelere nas ofertas, até 30 por cento off" src="https://down-br.img.susercontent.com/file/b"></a>
+<a href="/shop/557242410"><img alt="Lojas Oficiais Colgate-Palmolive. Ofertas imperdíveis pra você" src="https://down-br.img.susercontent.com/file/c"></a>
+<a href="/collections/25150486"><img alt="Anúncio. Lojas Oficiais: A Black Friday Forever Liss chegou." src="https://down-br.img.susercontent.com/file/d"></a>
+<a href="/oficial"><img alt="Lojas Oficiais. Cashback em todas as compras. Frete Grátis e mais" src="https://down-br.img.susercontent.com/file/e"></a>
+<a href="/oficial"><img alt="Lojas Oficiais" src="https://down-br.img.susercontent.com/file/f"></a>
+<a href="/buyer/signup?next=x"><img alt="Cupom exclusivo para sua primeira compra. Frete Grátis." src="https://down-br.img.susercontent.com/file/g"></a>
+</body></html>"""
+
+
+def test_shopee_17_11_links_relativos_e_rotulo_anuncio():
+    from shelfproof.detect.rules import detect
+
+    ps = detect(SHOPEE_17_11, "https://shopee.com.br/")
+    paid = {p.advertiser: p for p in ps if p.is_paid}
+    assert set(paid) == {"Podium", "Colgate-Palmolive", "Nao identificado"}
+    assert any("Anuncio" in e for e in paid["Podium"].evidence)
+    assert paid["Podium"].href == "https://shopee.com.br/shop/1311725041"
+    assert paid["Podium"].extra["shop_id"] == "1311725041"
+    # vitrine "Lojas Oficiais" da propria Shopee (/oficial) e cadastro nao sao pagos
+    assert not any("/oficial" in p.href or "signup" in p.href for p in ps if p.is_paid)
+    camp = [p for p in ps if p.ownership == "marketplace"]
+    assert [p.href for p in camp] == ["https://shopee.com.br/m/especial-black-friday"]

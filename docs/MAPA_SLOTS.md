@@ -69,6 +69,11 @@ ajuste a regra com teste.
   com `needs_review` para conferir a grafia.
 - **Imagem:** o `<img src>` traz `<arquivo>` e o navegador baixa `<arquivo>@resize_w797_nl.webp`;
   o casamento ignora o sufixo de tamanho (`pipeline._src_key`).
+- **17/11/2026 (renderizado):** links **relativos** (`/m/...`, `/shop/<id>`, `/collections/<id>`) e o texto
+  da peça paga começa com **"Anúncio."** ("Anúncio. Lojas Oficiais Podium."). `adsTrackingPayload` sumiu.
+  "Lojas Oficiais. Cashback..." → `/oficial` é a vitrine da própria Shopee: não é pago (sem destino de loja).
+- **Seletor de idioma do cabeçalho** virou `<button>Português (BR)</button>`: clicar abre um menu por cima
+  da vitrine. O robô só clica "Português (BR)" com a janela "Selecione seu idioma" aberta.
 - **Janela de idioma:** opções sem papel de botão; o robô clica "Português (BR)" só dentro da
   janela "Selecione seu idioma" (o cabeçalho tem o mesmo texto).
 

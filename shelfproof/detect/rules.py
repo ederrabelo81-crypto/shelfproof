@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 from typing import Callable, Dict, Iterable, List, Optional
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
@@ -347,30 +347,50 @@ def _shopee_store_name(alt: str, href: str) -> "tuple[str, str]":
     return "", ""
 
 
+_SHOPEE_BASE = "https://shopee.com.br"
+_SHOPEE_AD_PREFIX = re.compile(r"^\s*an[uú]ncio\s*[.:\-]\s*", re.I)
+# destino de loja/colecao vendida (17/11/2026 os links vem relativos: /shop/<id>, /collections/<id>, /m/<loja>)
+_SHOPEE_STORE_DEST = re.compile(r"(?:^|shopee\.com\.br)/(shop|collections)/\d+|(?:^|shopee\.com\.br)/m/", re.I)
+
+
 def _shopee(soup: BeautifulSoup) -> List[Piece]:
     out: List[Piece] = []
     for img in soup.find_all("img"):
-        href = parent_href(img)
+        raw_href = parent_href(img)
+        href = urljoin(_SHOPEE_BASE, raw_href) if raw_href else ""
         alt = _clean(img.get("alt"), 240)
+        labeled = bool(_SHOPEE_AD_PREFIX.match(alt))      # "Anuncio. Lojas Oficiais Podium..." (17/11/2026)
+        text = _SHOPEE_AD_PREFIX.sub("", alt) if labeled else alt
+        dest = _SHOPEE_STORE_DEST.search(raw_href or "")
         if "adsTrackingPayload" in href:
             sid = re.search(r"/shop/(\d+)", href)
             out.append(Piece("shopee", "paid", "official_store", find_brand(alt) or UNKNOWN_ADVERTISER,
                              "banner de loja", 1, title=alt or f"loja {sid.group(1) if sid else ''}", alt=alt, href=href,
                              img_src=img_src(img), evidence=["link do banner traz adsTrackingPayload (Shopee Ads)"],
                              extra={"shop_id": sid.group(1) if sid else ""}))
-        elif alt.lower().startswith("lojas oficiais") and "/m/" in href:
-            evidence = ["banner 'Lojas Oficiais' no carrossel principal (espaco vendido a lojas; selo Anuncio na peca)"]
+        elif text.lower().startswith("lojas oficiais") and dest and (labeled or len(text) > 25):
+            # "Lojas Oficiais. Cashback..." -> /oficial e a vitrine da propria Shopee: sem destino de loja, fica de fora
+            evidence = ["texto da peca comeca com 'Anuncio.' (rotulo de midia paga)"] if labeled else []
+            evidence.append("banner 'Lojas Oficiais' com destino de loja/colecao (espaco vendido a lojas)")
             extra: Dict[str, str] = {}
-            brand = find_brand(alt)
+            sid = re.search(r"/(?:shop|collections)/(\d+)", raw_href or "")
+            if sid:
+                extra["shop_id"] = sid.group(1)
+            brand = find_brand(text)
             if not brand:
-                brand, how = _shopee_store_name(alt, href)
+                brand, how = _shopee_store_name(text, href)
                 if brand:
                     evidence.append(how)
                     extra["needs_review"] = "nome da loja tirado do texto/destino: conferir grafia e incluir em brands.py"
             out.append(Piece("shopee", "paid", "official_store", brand or UNKNOWN_ADVERTISER,
                              "Lojas Oficiais", 1, title=alt, alt=alt, href=href, img_src=img_src(img),
                              evidence=evidence, extra=extra))
-        elif "shopee.com.br/m/" in href and len(alt) > 25:
+        elif labeled and dest:
+            # rotulo "Anuncio." sem "Lojas Oficiais": pago, anunciante pela marca do texto ou pela visao
+            out.append(Piece("shopee", "paid", "banner", find_brand(text) or UNKNOWN_ADVERTISER, "carrossel principal",
+                             1, title=alt, alt=alt, href=href, img_src=img_src(img),
+                             evidence=["texto da peca comeca com 'Anuncio.' (rotulo de midia paga)"]))
+        elif re.match(r"^(?:https?://(?:www\.)?shopee\.com\.br)?/m/", raw_href or "") and len(alt) > 25:
             out.append(Piece("shopee", "marketplace", "banner", "Shopee", "carrossel principal", 1, title=alt, alt=alt,
                              href=href, img_src=img_src(img), evidence=["banner de campanha /m/ sem marcador de anuncio"],
                              extra={"featured_brand": find_brand(alt) or ""}))

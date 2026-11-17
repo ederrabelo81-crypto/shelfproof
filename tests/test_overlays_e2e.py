@@ -178,3 +178,22 @@ def test_nao_clica_de_novo_o_que_ja_fechou():
     finally:
         browser.close()
         playwright_runtime.release()
+
+
+@pytest.mark.skipif(not _has_browser(), reason="sem Playwright/Chrome nesta maquina")
+def test_botao_de_idioma_do_cabecalho_nao_e_clicado():
+    # Shopee 17/11/2026: o seletor do cabecalho virou <button>Portugues (BR)</button> e o menu ficava aberto
+    from shelfproof.browser import playwright_runtime
+    from shelfproof.collect.capture import dismiss_overlays
+
+    pw, _ = playwright_runtime.acquire()
+    browser = pw.chromium.launch(headless=True, channel="chrome")
+    try:
+        page = browser.new_page()
+        page.set_content('<header><button onclick="document.body.dataset.menu=1">Português (BR)</button></header>'
+                         '<div id="ck"><button onclick="this.parentNode.remove()">Aceitar todos os cookies</button></div>')
+        assert dismiss_overlays(page) == ["Aceitar todos os cookies"]
+        assert page.evaluate("document.body.dataset.menu") is None
+    finally:
+        browser.close()
+        playwright_runtime.release()
