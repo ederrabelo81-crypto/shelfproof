@@ -16,6 +16,11 @@ ajuste a regra com teste.
 - **Também:** banners laterais "Banner de ofertas do Magazine Luiza" com `/selecao/<marca>`;
   vitrine com título "Patrocinados" (cards de produto).
 - **Armadilha:** slot com texto "patrocinada" e destino sem marca = campanha da Magalu (S3).
+- **Celular (17/11/2026):** a home vai para `m.magazineluiza.com.br`. Slots pedidos pela página
+  (config da home, `consumer: mobile`): `msite_home_Ads_carrossel_p3..p5`, `msite_home_carrossel_p6_10`,
+  `msite_home_Ads_large_1..5`, `msite_home_Promo_carrossel_p1..p2`, `msite_home_Promo_hypertop`,
+  `msite_home_Promo_micro`. As vitrines são `lazyload-container` vazias até a rolagem chegar nelas.
+  O alt dos banners renderizados ainda não foi visto: conferir na próxima captura.
 
 ## Casas Bahia
 - **Marcador:** `vtr_name=Ads_CB_<data>_<Marca>_<Desk|Mob>...` no link.

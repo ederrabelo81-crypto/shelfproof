@@ -143,3 +143,15 @@ Nunca clicar em login, captcha ou "Configurações".
 `lxml` e a 1ª rodada do celular capturou tudo e não classificou nada. **Certo:** venv próprio
 (`scripts\instalar.bat` cria `shelf-proof\.venv`); os `.bat` usam `scripts\_python.bat`, que
 escolhe esse venv mesmo com outro ativado, e o `event` confere os pacotes antes de abrir o Chrome.
+
+### S17. Pesquisa num iframe e rolagem que não rola (Magalu celular, 17/11/2026)
+**Errado:** a home do celular saiu com 1962 px e as vitrines (`lazyload-container`) vazias. A
+pesquisa "Queremos o seu feedback" (QuestionPro) é um **iframe** por cima da home, carregado por
+último: o robô só procurava botões na página principal, e a roda do mouse não moveu a página.
+**Certo:** `dismiss_overlays` procura também nos iframes ("Agora não", nunca "Sim") e roda de novo
+antes de rolar; `_human_scroll` rola por script quando a roda não mexe (`manifest.script_scrolls`).
+
+### S18. `py -3` pegou um Python 32 bits (17/11/2026)
+**Errado:** criar o venv com o primeiro Python 3 do PC: era 3.14 **32 bits**, o `greenlet` não
+tinha pacote pronto e pediu o compilador C++. **Certo:** `scripts\instalar.bat` só aceita 64 bits
+(prefere 3.13) e recria o `.venv` se ele for de 32 bits.

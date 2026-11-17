@@ -105,3 +105,55 @@ def test_peca_em_fundo_css_entra_nos_elementos():
     finally:
         browser.close()
         playwright_runtime.release()
+
+
+# Magalu celular 17/11/2026: pesquisa QuestionPro num iframe srcdoc por cima da home
+HTML_PESQUISA = """<html><body style="height:6000px"><h1>home</h1>
+<div role="dialog" aria-modal="true" aria-label="Survey popup"><iframe id="pq" style="position:fixed;top:10%;left:10%;
+width:80%;height:80%" srcdoc="<html><body><p>Queremos o seu feedback:</p>
+<button onclick=&quot;parent.document.body.dataset.sim='1'&quot;>Sim</button>
+<button onclick=&quot;parent.document.getElementById('pq').remove()&quot;>Agora não</button></body></html>"></iframe></div>
+</body></html>"""
+
+
+@pytest.mark.skipif(not _has_browser(), reason="sem Playwright/Chrome nesta maquina")
+def test_pesquisa_dentro_de_iframe_recusa_e_nunca_responde():
+    from shelfproof.browser import playwright_runtime
+    from shelfproof.collect.capture import dismiss_overlays
+
+    pw, _ = playwright_runtime.acquire()
+    browser = pw.chromium.launch(headless=True, channel="chrome")
+    try:
+        page = browser.new_page()
+        page.set_content(HTML_PESQUISA)
+        page.wait_for_timeout(300)
+        assert dismiss_overlays(page) == ["Agora não"]
+        assert page.locator("#pq").count() == 0
+        assert page.evaluate("document.body.dataset.sim") is None  # nao aceitou a pesquisa
+    finally:
+        browser.close()
+        playwright_runtime.release()
+
+
+@pytest.mark.skipif(not _has_browser(), reason="sem Playwright/Chrome nesta maquina")
+def test_rolagem_por_script_quando_a_roda_nao_mexe_a_pagina():
+    from shelfproof.browser import playwright_runtime
+    from shelfproof.collect.capture import _human_scroll
+
+    pw, _ = playwright_runtime.acquire()
+    browser = pw.chromium.launch(headless=True, channel="chrome")
+    try:
+        page = browser.new_page(viewport={"width": 412, "height": 915})
+        # a roda nao rola (como sob o iframe da pesquisa); o lazy-load cresce a pagina ao chegar no fim
+        page.set_content("""<body style="margin:0"><div id="c" style="height:2000px"></div><script>
+          addEventListener('wheel', (e) => e.preventDefault(), {passive: false});
+          let n = 0; addEventListener('scroll', () => { if (n < 3 && scrollY + innerHeight > document.body.scrollHeight - 50)
+            { n++; document.getElementById('c').style.height = (2000 + n * 2000) + 'px'; } });
+        </script></body>""")
+        st = {}
+        h = _human_scroll(page, 40, st)
+        assert h >= 8000 and st["script_scrolls"] > 0
+        assert page.evaluate("window.scrollY") == 0  # volta ao topo para o print
+    finally:
+        browser.close()
+        playwright_runtime.release()

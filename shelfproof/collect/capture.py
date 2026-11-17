@@ -405,13 +405,28 @@ def _open_context(cfg: CaptureConfig):
     return ctx, page, cleanup
 
 
-def _human_scroll(page: Any, max_steps: int) -> int:
-    """Rola ate o fim (lazy-load), com pausas humanas; volta ao topo. Devolve a altura final."""
+def _human_scroll(page: Any, max_steps: int, stats: Optional[Dict[str, int]] = None) -> int:
+    """Rola ate o fim (lazy-load), com pausas humanas; volta ao topo. Devolve a altura final.
+
+    Se a roda do mouse nao mexer a pagina (celular emulado, ou o cursor parado sobre um iframe
+    que engole a rolagem: Magalu celular 17/11/2026 parou em 1962 px com as vitrines vazias),
+    rola por script, do mesmo tamanho. ``stats["script_scrolls"]`` conta quantas vezes.
+    """
     last_h, still = 0, 0
+    if stats is not None:
+        stats.setdefault("script_scrolls", 0)
     for _ in range(max_steps):
         vh = page.evaluate("window.innerHeight")
-        page.mouse.wheel(0, int(vh * random.uniform(0.7, 0.9)))
+        dy = int(vh * random.uniform(0.7, 0.9))
+        y0 = page.evaluate("window.scrollY")
+        page.mouse.wheel(0, dy)
         time.sleep(random.uniform(0.6, 1.2))
+        if page.evaluate("window.scrollY") == y0 and not page.evaluate(
+                "window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4"):
+            page.evaluate(f"window.scrollBy(0, {dy})")
+            time.sleep(random.uniform(0.6, 1.2))
+            if stats is not None:
+                stats["script_scrolls"] += 1
         h = page.evaluate("document.documentElement.scrollHeight")
         at_end = page.evaluate("window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4")
         if at_end:
@@ -451,6 +466,9 @@ OVERLAY_BUTTONS = [
     re.compile(r"^\s*portugu[eê]s\s*\(br\)\s*$", re.I),            # Shopee: "Selecione seu idioma"
     re.compile(r"^\s*aceitar( todos)?( os)?( cookies)?\s*$", re.I),  # aviso de cookies
     re.compile(r"^\s*(aceito|concordo|entendi|ok,? entendi)\s*$", re.I),
+    # pesquisa de satisfacao (Magalu celular 17/11/2026: QuestionPro "Queremos o seu feedback",
+    # dentro de um iframe). Recusar a pesquisa e o que o cliente faz para ver a vitrine.
+    re.compile(r"^\s*(agora n[aã]o|n[aã]o,? obrigad[oa])\s*$", re.I),
 ]
 
 
@@ -481,7 +499,11 @@ def _click_language_option(page: Any, pat: Any) -> str:
 
 
 def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
-    """Fecha janelas que cobrem a vitrine (idioma, cookies). Devolve o que foi clicado, para o manifest."""
+    """Fecha janelas que cobrem a vitrine (idioma, cookies, pesquisa). Devolve o que foi clicado.
+
+    Botoes sao procurados tambem dentro de iframes: a pesquisa da Magalu no celular (QuestionPro)
+    e um iframe por cima da home, e o "Agora nao" nao aparece para a pagina principal.
+    """
     clicked: List[str] = []
     for _ in range(passes):
         hit = False
@@ -495,15 +517,19 @@ def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
                         hit = True
                         time.sleep(random.uniform(0.6, 1.2))
                     continue
-                loc = page.get_by_role("button", name=pat)
-                for i in range(min(loc.count(), 3)):
-                    b = loc.nth(i)
-                    if b.is_visible():
-                        name = (b.inner_text(timeout=1000) or "").strip()
-                        b.click(timeout=2000)
-                        clicked.append(name)
-                        hit = True
-                        time.sleep(random.uniform(0.6, 1.2))
+                for fr in _frames(page):
+                    loc = fr.get_by_role("button", name=pat)
+                    done = False
+                    for i in range(min(loc.count(), 3)):
+                        b = loc.nth(i)
+                        if b.is_visible():
+                            name = (b.inner_text(timeout=1000) or "").strip()
+                            b.click(timeout=2000)
+                            clicked.append(name)
+                            hit = done = True
+                            time.sleep(random.uniform(0.6, 1.2))
+                            break
+                    if done:
                         break
             except Exception:
                 continue  # botao sumiu entre a contagem e o clique: segue
@@ -511,6 +537,15 @@ def dismiss_overlays(page: Any, passes: int = 2) -> List[str]:
             break
         time.sleep(1.0)  # a proxima janela pode aparecer depois da primeira
     return clicked
+
+
+def _frames(page: Any) -> List[Any]:
+    """A pagina e os iframes dela (a pagina primeiro)."""
+    try:
+        main = page.main_frame
+        return [main] + [f for f in page.frames if f is not main]
+    except Exception:
+        return [page]
 
 
 def _looks_blocked(page: Any, n_imgs: int, http_status: Optional[int] = None) -> Optional[str]:
@@ -596,9 +631,16 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             time.sleep(cfg.carousel_interval)
         manifest["frames"] = frames
 
-        # 2) rolar ate o fim para carregar o lazy-load
+        # 2) rolar ate o fim para carregar o lazy-load. Antes, fechar de novo: janela que carrega
+        # por ultimo (pesquisa da Magalu, lazyOnload) aparece depois da 1a tentativa.
         try:
-            manifest["page_height"] = _human_scroll(page, cfg.max_scroll_steps)
+            manifest["dismissed"] = manifest.get("dismissed", []) + dismiss_overlays(page)
+        except Exception as exc:
+            errors.append(f"overlays: {exc}")
+        try:
+            st: Dict[str, int] = {}
+            manifest["page_height"] = _human_scroll(page, cfg.max_scroll_steps, st)
+            manifest["script_scrolls"] = st.get("script_scrolls", 0)
         except Exception as exc:
             errors.append(f"scroll: {exc}")
 
