@@ -15,21 +15,22 @@ REM
 REM ASCII only (ver COMMON_MISTAKES R13).
 setlocal
 cd /d "%~dp0.."
+call scripts\_python.bat
 set RAC_LOCAL_CHROME=1
 if "%RAC_CDP_PORT%"=="" set RAC_CDP_PORT=9223
-for /f %%d in ('python -m shelfproof today') do set HOJE=%%d
+for /f %%d in ('%PY% -m shelfproof today') do set HOJE=%%d
 if "%HOJE%"=="" (
-  echo Python ou o pacote shelfproof nao respondeu. Rode: pip install -r requirements.txt
+  echo Python ou o pacote shelfproof nao respondeu. Rode: scripts\instalar.bat
   exit /b 1
 )
 echo === Shelf Proof: rodada da coleta de %HOJE% ===
-python -m shelfproof event %*
+%PY% -m shelfproof event %*
 set RC=%ERRORLEVEL%
 if not exist runs\showroom\%HOJE%\index.html (
   echo Nenhuma captura util hoje. Veja logs\coleta_%HOJE%.log
   exit /b 2
 )
-python -m shelfproof contact-sheet runs\showroom\%HOJE%
+%PY% -m shelfproof contact-sheet runs\showroom\%HOJE%
 echo.
 echo Showroom do dia:   runs\showroom\%HOJE%\index.html
 echo Folha de contato:  runs\showroom\%HOJE%\contact_sheet.jpg

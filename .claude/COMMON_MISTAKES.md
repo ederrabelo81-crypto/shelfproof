@@ -137,3 +137,9 @@ Nunca clicar em login, captcha ou "Configurações".
 `<img src>` e o navegador baixa `<arquivo>@resize_w797_nl.webp`; o ML troca `D_NQ_2X_` por
 `D_NQ_`. Resultado: 3 "Nao identificado" sem imagem, e a visão nem foi chamada. **Certo:**
 `pipeline._src_key` (sem sufixo de tamanho e sem extensão) como segundo critério.
+
+### S16. Rodar o Shelf Proof com o Python do RAC (17/11/2026)
+**Errado:** terminal com o `.venv` do `rac-position-tracker` ativado; o venv do RAC não tem o
+`lxml` e a 1ª rodada do celular capturou tudo e não classificou nada. **Certo:** venv próprio
+(`scripts\instalar.bat` cria `shelf-proof\.venv`); os `.bat` usam `scripts\_python.bat`, que
+escolhe esse venv mesmo com outro ativado, e o `event` confere os pacotes antes de abrir o Chrome.

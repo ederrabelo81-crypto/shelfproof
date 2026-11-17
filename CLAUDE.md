@@ -118,7 +118,8 @@ python -m shelfproof contact-sheet runs/showroom/2026-11-17 # revisar; review.js
 python -m shelfproof event --rebuild                        # refaz o dia sem capturar
 ```
 
-Windows (PC coletor), à mão por enquanto (agendamento a cada hora vem depois):
+Windows (PC coletor): `scripts\instalar.bat` uma vez (venv próprio, não o do RAC — COMMON_MISTAKES S16).
+À mão por enquanto (agendamento a cada hora vem depois):
 `scripts\coleta_dia.bat` (uma rodada; aceita as opções do `event`),
 `scripts\remontar_dia.bat` (depois do `review.json`), `scripts\publicar_dia.bat`.
 Imagens no `review.json`: `<site>_<nn>` no desktop e `<site>_m_<nn>` no celular; a
