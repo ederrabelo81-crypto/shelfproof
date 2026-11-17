@@ -20,7 +20,8 @@ ajuste a regra com teste.
   (config da home, `consumer: mobile`): `msite_home_Ads_carrossel_p3..p5`, `msite_home_carrossel_p6_10`,
   `msite_home_Ads_large_1..5`, `msite_home_Promo_carrossel_p1..p2`, `msite_home_Promo_hypertop`,
   `msite_home_Promo_micro`. As vitrines são `lazyload-container` vazias até a rolagem chegar nelas.
-  O alt dos banners renderizados ainda não foi visto: conferir na próxima captura.
+  Com UA Android essas vitrines não carregam (CORS no graphql, COMMON_MISTAKES S21). No modo
+  `viewport` (tela de celular, navegador de desktop) a home vem completa, mas com os slots `desk_...`.
 
 ## Casas Bahia
 - **Marcador:** `vtr_name=Ads_CB_<data>_<Marca>_<Desk|Mob>...` no link.

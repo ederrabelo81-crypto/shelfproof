@@ -27,7 +27,8 @@ BRANDS: List[Tuple[str, List[str]]] = [
     ("WAP", [r"\bwap\b", r"\bwap[-_]"]),
     ("Gree", [r"\bgree\b"]),
     ("Elgin", [r"elgin"]),
-    ("TCL", [r"\btcl\b"]),
+    # slug de campanha usa "_" (tcl_tv_blackfriday26, Magalu 17/11/2026): \b nao separa "tcl" de "_"
+    ("TCL", [r"(?<![a-z0-9])tcl(?![a-z0-9])"]),
     ("Daikin", [r"daikin"]),
     ("Fujitsu", [r"fujitsu"]),
     ("Agratto", [r"agratto"]),
@@ -36,6 +37,9 @@ BRANDS: List[Tuple[str, List[str]]] = [
     ("Lenovo", [r"lenovo"]),
     ("Dell", [r"\bdell\b"]),
     ("Motorola", [r"motorola", r"\bmoto\s?g"]),
+    # slugs /selecao/ da Magalu em 17/11/2026 (carrossel p6_10): ambevnov26, madesanov26
+    ("Ambev", [r"ambev"]),
+    ("Madesa", [r"madesa"]),
     # vistos na Magalu em 12/11/2026 (vitrine Patrocinados) e comuns em celular/informatica.
     # Fora de proposito: HP (cavalo-vapor em motor/bomba) e Positivo (palavra comum).
     ("OPPO", [r"\boppo\b"]),

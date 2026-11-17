@@ -52,7 +52,7 @@ def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[st
     if viewport_only:
         notes.append(f"Celular em {', '.join(viewport_only)}: tela e toque de celular, com o navegador se "
                      "apresentando como desktop (com a identificação de Android as vitrines não carregavam). "
-                     "O layout é o do celular; os anúncios podem ser os que o site escolhe para desktop.")
+                     "O layout é o do celular, mas os espaços pagos são os que o site vende para desktop (slots desk_...).")
         notes.append("Mídia paga só com marcador concreto na página (rótulo, código de slot ou parâmetro de anúncio); "
                  "anunciante sem nome na página fica \"Não identificado\" ou é lido na própria peça.")
     notes.append("Espaços pagos sem imagem salva entram no ranking e aparecem na prova como registro de código.")

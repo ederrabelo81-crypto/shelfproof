@@ -176,4 +176,11 @@ barradas por **CORS** e todas as vitrines ficavam vazias (1962 px, 9 imagens). N
 com a janela estreita, vinha completa. **Certo:** na Magalu, `"mobile_emulation": "viewport"` no
 `targets.json`: tela 412 px e toque de celular, navegador se apresentando como desktop (6535 px,
 49 imagens, graphql 200). O Showroom avisa na metodologia. Teste A/B: `scripts\teste_celular_magalu.bat`.
-**Ainda conferir:** se os slots pagos dessa tela são os de celular (`msite_...`) ou os de desktop (`desk_...`).
+**Conferido (17/11, rodada 5):** nessa tela os slots pagos são os de **desktop** (`desk_hypertop_Ads_small`,
+`desk_home_Ads_large_carrossel_p3..p5`): layout de celular, anúncio escolhido para desktop. Os `msite_...`
+só viriam com UA Android, que hoje esbarra no CORS.
+
+### S22. `\b` em slug com sublinhado (17/11/2026)
+**Errado:** `\btcl\b` não acha "tcl" em `tcl_tv_blackfriday26` (o `_` conta como letra para o `\b`),
+e o banner do slot `desk_hypertop_Ads_small` virou campanha da Magalu. **Certo:** em marca que
+aparece em slug, `(?<![a-z0-9])tcl(?![a-z0-9])`.
