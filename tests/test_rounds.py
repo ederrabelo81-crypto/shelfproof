@@ -201,3 +201,19 @@ def test_celular_emulado_na_aba_pelo_cdp():
     finally:
         browser.close()
         playwright_runtime.release()
+
+
+def test_modo_viewport_so_muda_a_tela():
+    from shelfproof.browser import playwright_runtime
+    from shelfproof.collect.capture import emulate_mobile_tab
+
+    pw, browser = _browser()
+    try:
+        page = browser.new_context().new_page()
+        emulate_mobile_tab(page, browser.version, mode="viewport")
+        page.goto("data:text/html,<meta name=viewport content='width=device-width'><p>x</p>")
+        got = page.evaluate("() => ({ua: navigator.userAgent, w: innerWidth, touch: navigator.maxTouchPoints})")
+        assert "Android" not in got["ua"] and got["w"] == 412 and got["touch"] == 5
+    finally:
+        browser.close()
+        playwright_runtime.release()

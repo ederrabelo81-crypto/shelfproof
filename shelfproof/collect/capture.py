@@ -336,18 +336,36 @@ def mobile_ua_metadata(chrome_version: str) -> Dict[str, Any]:
     }
 
 
-def emulate_mobile_tab(page: Any, chrome_version: str = "") -> Any:
+MOBILE_EMULATION_MODES = ("full", "no_lang", "viewport")
+
+
+def mobile_emulation_mode() -> str:
+    """SHELFPROOF_MOBILE_EMULATION: full (UA + client hints + idioma), no_lang (UA + client hints,
+    sem forcar idioma/plataforma, como o modo dispositivo do DevTools) ou viewport (so tela e toque;
+    o navegador continua se apresentando como desktop). Teste A/B da Magalu celular, 17/11/2026."""
+    import os
+
+    m = (os.environ.get("SHELFPROOF_MOBILE_EMULATION") or "full").strip().lower()
+    return m if m in MOBILE_EMULATION_MODES else "full"
+
+
+def emulate_mobile_tab(page: Any, chrome_version: str = "", mode: str = "") -> Any:
     """Celular numa aba do perfil dedicado (anon_warm): tela, toque, UA e client hints pelo CDP.
 
     E o que o modo dispositivo do DevTools faz. Precisa vir ANTES do aquecimento e do goto:
     o Akamai le o UA no sensor e o _abck validado tem de ser o do celular.
     """
+    mode = mode or mobile_emulation_mode()
     vp = DEVICES["mobile"]["viewport"]
     ua = context_options("mobile", chrome_version)["user_agent"]
     cdp = page.context.new_cdp_session(page)
-    cdp.send("Emulation.setUserAgentOverride", {
-        "userAgent": ua, "acceptLanguage": "pt-BR,pt;q=0.9", "platform": "Linux armv8l",
-        "userAgentMetadata": mobile_ua_metadata(chrome_version)})
+    if mode == "full":
+        cdp.send("Emulation.setUserAgentOverride", {
+            "userAgent": ua, "acceptLanguage": "pt-BR,pt;q=0.9", "platform": "Linux armv8l",
+            "userAgentMetadata": mobile_ua_metadata(chrome_version)})
+    elif mode == "no_lang":
+        cdp.send("Emulation.setUserAgentOverride", {
+            "userAgent": ua, "userAgentMetadata": mobile_ua_metadata(chrome_version)})
     cdp.send("Emulation.setDeviceMetricsOverride", {
         "width": vp["width"], "height": vp["height"], "mobile": True,
         "deviceScaleFactor": DEVICES["mobile"]["device_scale_factor"]})
@@ -721,7 +739,8 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         if cfg.session == "anon_warm":
             try:
                 if cfg.device == "mobile":
-                    manifest["emulation"] = "cdp_tab"  # celular emulado na aba do perfil dedicado
+                    # celular emulado na aba do perfil dedicado; o modo vai junto (viewport = UA de desktop)
+                    manifest["emulation"] = f"cdp_tab:{mobile_emulation_mode()}"
                 stage("warmup")
                 manifest["warmup"] = _warm_up(page, cfg.url, cfg.device)
                 logger.info(f"[capture] aquecimento: {manifest['warmup']}")
@@ -750,12 +769,12 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
 
         def _on_pageerror(e: Any) -> None:
             if len(js_errors) < 15:
-                js_errors.append(f"pageerror: {str(e)[:200]}")
+                js_errors.append(f"pageerror: {str(e)[:400]}")
 
         def _on_console(m: Any) -> None:
             try:
                 if m.type == "error" and len(js_errors) < 15:
-                    js_errors.append(f"console: {m.text[:200]}")
+                    js_errors.append(f"console: {m.text[:400]}")
             except Exception:
                 pass
 
@@ -767,6 +786,41 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             except Exception:
                 pass
 
+        # CORS: o Playwright nao mostra a resposta do preflight. Pelo CDP da aba: o tipo exato do erro
+        # (corsErrorStatus) e o Access-Control-Allow-Origin que o servidor devolveu (Magalu celular 17/11)
+        cors: List[Dict[str, Any]] = []
+        manifest["cors_errors"] = cors
+        try:
+            net = getattr(page, "_shelfproof_cdp", None) or page.context.new_cdp_session(page)
+            page._shelfproof_net = net
+            req_info: Dict[str, Dict[str, Any]] = {}
+            net.send("Network.enable")
+
+            def _will(ev: Dict[str, Any]) -> None:
+                if len(req_info) < 3000:
+                    req_info[ev.get("requestId", "")] = {"url": ev.get("request", {}).get("url", "")[:160],
+                                                         "method": ev.get("request", {}).get("method", "")}
+
+            def _resp(ev: Dict[str, Any]) -> None:
+                r = ev.get("response", {})
+                info = req_info.get(ev.get("requestId", ""))
+                if info is not None:
+                    h = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
+                    info.update(status=r.get("status"), acao=h.get("access-control-allow-origin"),
+                                acac=h.get("access-control-allow-credentials"), vary=h.get("vary"))
+
+            def _failed(ev: Dict[str, Any]) -> None:
+                st = ev.get("corsErrorStatus")
+                if st and len(cors) < 15:
+                    info = dict(req_info.get(ev.get("requestId", ""), {}))
+                    cors.append(dict(info, cors_error=st.get("corsError"), failed_parameter=st.get("failedParameter"),
+                                     error=ev.get("errorText")))
+
+            net.on("Network.requestWillBeSent", _will)
+            net.on("Network.responseReceived", _resp)
+            net.on("Network.loadingFailed", _failed)
+        except Exception as exc:
+            manifest["cors_errors_unavailable"] = str(exc)[:200]
         page.on("pageerror", _on_pageerror)
         page.on("console", _on_console)
         page.on("response", _on_api)

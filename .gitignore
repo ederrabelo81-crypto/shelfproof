@@ -6,6 +6,7 @@ __pycache__/
 venv/
 data/
 runs/
+runs_teste/
 logs/
 review.json
 site/
