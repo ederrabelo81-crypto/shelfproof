@@ -508,7 +508,8 @@ renderProof();
     const here = location.pathname.split('/').filter(Boolean).pop() || '';
     const sel = $('#daySel');
     list.forEach((e) => {
-      const o = el('option', null, e.date + ' · ' + e.event + ' · ' + e.paid + ' pagos');
+      const kp = (!e.paid && e.featured) ? e.featured + ' destaques' : e.paid + ' pagos';
+      const o = el('option', null, e.date + ' · ' + e.event + ' · ' + kp);
       o.value = e.slug; if (e.slug === here) o.selected = true; sel.append(o);
     });
     sel.addEventListener('change', () => { location.href = '../' + encodeURIComponent(sel.value) + '/'; });

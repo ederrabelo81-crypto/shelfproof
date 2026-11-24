@@ -38,3 +38,33 @@ def test_publica_showroom_e_monta_indice(tmp_path: Path):
 def test_slug_invalido(tmp_path: Path):
     with pytest.raises(ValueError):
         add_showroom(REF, tmp_path / "site", "Black Friday!")
+
+
+def test_especialistas_no_mesmo_dia_ao_lado_dos_marketplaces(tmp_path: Path):
+    """24/11/2026: o Showroom dos especialistas (sem pago, com marca em destaque) vai para
+    <dia>-especialistas; a home continua abrindo o dos marketplaces e o indice mostra os destaques."""
+    mk = tmp_path / "mk"
+    shutil.copytree(REF, mk)
+    d = json.loads((mk / "data.json").read_text(encoding="utf-8"))
+    d["data"]["date"] = "27/11/2026"
+    (mk / "data.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    esp = tmp_path / "esp"
+    shutil.copytree(REF, esp)
+    e = json.loads((esp / "data.json").read_text(encoding="utf-8"))
+    e["data"]["date"] = "27/11/2026"
+    e["context"]["event_label"] = "Black Friday - Especialistas"
+    e["data"]["extras"] = []
+    for i, r in enumerate(e["data"]["pieces"]):
+        r["k"] = "own"
+        if i < 5:
+            r["fb"] = "Midea" if i < 3 else "LG"
+    (esp / "data.json").write_text(json.dumps(e, ensure_ascii=False), encoding="utf-8")
+    site = tmp_path / "site"
+    add_showroom(esp, site, "2026-11-27-especialistas")
+    add_showroom(mk, site, "2026-11-27")
+    ev = json.loads((site / "events.json").read_text(encoding="utf-8"))
+    assert [x["slug"] for x in ev] == ["2026-11-27", "2026-11-27-especialistas"]
+    assert ev[1]["paid"] == 0 and ev[1]["featured"] == 5
+    idx = (site / "index.html").read_text(encoding="utf-8")
+    assert 'url=2026-11-27/"' in idx
+    assert "banners com marca em destaque" in idx and "em destaque: Midea 3 · LG 2" in idx

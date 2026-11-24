@@ -57,14 +57,22 @@ def _summary(event_dir: Path) -> Dict[str, Any]:
     for r in named:
         count[r["adv"]] = count.get(r["adv"], 0) + 1
     top = sorted(count.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+    # varejo especialista (24/11/2026): sem pago; o que se mostra e a marca em destaque nos banners da loja
+    feat: Dict[str, int] = {}
+    for r in data["pieces"]:
+        if r.get("k") != "paid" and r.get("fb"):
+            feat[r["fb"]] = feat.get(r["fb"], 0) + 1
     return {"slug": event_dir.name, "event": ctx.get("event_label", event_dir.name), "date": data.get("date", ""),
             "header": ctx.get("header_line", ""), "sites": len(data.get("mkts", {})), "paid": len(paid),
-            "advertisers": len(count), "top": top}
+            "advertisers": len(count), "top": top, "featured": sum(feat.values()),
+            "featured_top": sorted(feat.items(), key=lambda kv: (-kv[1], kv[0]))[:3]}
 
 
-def _date_key(s: Dict[str, Any]) -> str:
+def _date_key(s: Dict[str, Any]) -> tuple:
     m = re.match(r"(\d{2})/(\d{2})/(\d{4})", s["date"])
-    return f"{m.group(3)}{m.group(2)}{m.group(1)}" if m else s["slug"]
+    day = f"{m.group(3)}{m.group(2)}{m.group(1)}" if m else s["slug"]
+    # mesmo dia: o Showroom dos marketplaces vem antes do dos especialistas (a home abre o primeiro)
+    return (day, s["featured"] == 0 or s["paid"] > 0)
 
 
 def write_index(site_dir: Path) -> Path:
@@ -75,17 +83,23 @@ def write_index(site_dir: Path) -> Path:
             events.append(_summary(d))
     events.sort(key=_date_key, reverse=True)
     (site_dir / "events.json").write_text(json.dumps(
-        [{k: e[k] for k in ("slug", "date", "event", "paid", "advertisers")} for e in events],
+        [{k: e[k] for k in ("slug", "date", "event", "paid", "advertisers", "featured")} for e in events],
         ensure_ascii=False, indent=1), encoding="utf-8")
     cards = []
     for e in events:
-        top = " · ".join(f"{html.escape(a)} {n}" for a, n in e["top"]) or "sem anunciante identificado"
+        if e["paid"] == 0 and e["featured"]:
+            kp = (f'<b>{e["featured"]}</b> banners com marca em destaque · <b>{len(e["featured_top"])}</b>+ marcas · '
+                  f'<b>{e["sites"]}</b> páginas')
+            top = "em destaque: " + " · ".join(f"{html.escape(a)} {n}" for a, n in e["featured_top"])
+        else:
+            kp = (f'<b>{e["paid"]}</b> espaços pagos · <b>{e["advertisers"]}</b> anunciantes · '
+                  f'<b>{e["sites"]}</b> páginas')
+            top = " · ".join(f"{html.escape(a)} {n}" for a, n in e["top"]) or "sem anunciante identificado"
         cards.append(
             f'<a class="ev" href="{html.escape(e["slug"])}/">'
             f'<span class="dt">{html.escape(e["date"])}</span>'
             f'<span class="nm">{html.escape(e["event"])}</span>'
-            f'<span class="kp"><b>{e["paid"]}</b> espaços pagos · <b>{e["advertisers"]}</b> anunciantes · '
-            f'<b>{e["sites"]}</b> páginas</span>'
+            f'<span class="kp">{kp}</span>'
             f'<span class="tp">{top}</span></a>')
     body = "\n".join(cards) or '<p class="empty">Nenhum Showroom publicado ainda.</p>'
     page = f"""<!DOCTYPE html>
@@ -110,7 +124,7 @@ p.lede {{ color: var(--muted); margin: 0; max-width: 60ch; line-height:1.5; }}
 </style></head>
 <body><main>
 <h1>Shelf<b>Proof</b> · Showrooms</h1>
-<p class="lede">Quem comprou a vitrine dos marketplaces em cada coleta: peças reais, ranking de anunciantes e prova de veiculação.</p>
+<p class="lede">Quem comprou a vitrine dos marketplaces (e quais marcas o varejo especialista destacou) em cada coleta: peças reais, ranking e prova de veiculação.</p>
 <div class="list">
 {body}
 </div>

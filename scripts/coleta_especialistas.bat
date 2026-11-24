@@ -42,5 +42,6 @@ echo Folha de contato:  %SR%\contact_sheet.jpg
 echo Resumo por site:   runs\especialistas\AAAA-MM-DD\*\summary.json (featured_by_brand)
 if "%RC%"=="1" echo ATENCAO: algum site falhou ou foi bloqueado nesta rodada (veja a lista acima).
 echo Pessoa real/celebridade? Liste em %SR%\review.json e rode este script com --rebuild
+echo Para publicar no site: scripts\publicar_especialistas.bat (ou publicar_dia.bat, que publica os dois)
 start "" "%SR%\index.html"
 endlocal & exit /b %RC%

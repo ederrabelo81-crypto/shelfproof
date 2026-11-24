@@ -132,7 +132,8 @@ Windows (PC coletor): `scripts\instalar.bat` uma vez (venv próprio, não o do R
 À mão por enquanto (agendamento a cada hora vem depois):
 `scripts\coleta_dia.bat` (uma rodada; aceita as opções do `event`),
 `scripts\coleta_especialistas.bat` (as 11 homes de especialistas de ar-condicionado; `--rebuild` refaz),
-`scripts\remontar_dia.bat` (depois do `review.json`), `scripts\publicar_dia.bat`.
+`scripts\remontar_dia.bat` (depois do `review.json`), `scripts\publicar_dia.bat` (publica também os
+especialistas do dia, se houver), `scripts\publicar_especialistas.bat` (só os especialistas, slug `<dia>-especialistas`).
 Imagens no `review.json`: `<site>_<nn>` no desktop e `<site>_m_<nn>` no celular; a
 numeração segue a ordem em que a peça apareceu, então uma rodada nova não renumera.
 
