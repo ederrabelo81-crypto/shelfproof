@@ -12,6 +12,10 @@ REM   scripts\coleta_especialistas.bat --only "Frigelar,Dufrio"
 REM   scripts\coleta_especialistas.bat --devices desktop
 REM   scripts\coleta_especialistas.bat --rebuild      (refaz sem capturar, depois do review.json)
 REM
+REM Leitura visual LIGADA: banner da loja sem marca no link/alt/arquivo tem a marca
+REM lida na imagem (precisa de ANTHROPIC_API_KEY no .env; sem a chave, segue sem ler).
+REM O banner continua da loja: a leitura nao cria peca paga.
+REM
 REM ASCII only (ver COMMON_MISTAKES R13).
 setlocal
 cd /d "%~dp0.."
@@ -25,7 +29,7 @@ if "%HOJE%"=="" (
 )
 set SR=runs\especialistas\showroom\%HOJE%
 echo === Shelf Proof: especialistas de ar-condicionado, %HOJE% ===
-%PY% -m shelfproof event --targets config\targets_especialistas.json --out runs\especialistas --event "Black Friday - Especialistas" %*
+%PY% -m shelfproof event --targets config\targets_especialistas.json --out runs\especialistas --event "Black Friday - Especialistas" --vision %*
 set RC=%ERRORLEVEL%
 if not exist %SR%\index.html (
   echo Nenhuma captura util hoje. Veja logs\coleta_%HOJE%.log

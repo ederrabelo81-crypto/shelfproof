@@ -111,6 +111,11 @@ homes renderizadas (desktop, anônimo); fixtures em `tests/fixtures/homes_2026-1
   - Clima Rio: hero VTEX com `/<marca>?map=b`; "AUFIT" é marca exclusiva da loja.
   - WebContinental: carrossel e lista de banners quase só LG (`/selecao-lg`, `/lg-dual-inverter`).
   - Denteck (Nuvemshop): banners "Banner N" com `/search/?q=<marca>`; versões 1920 e 1024 no DOM.
+- **Leitura visual (`--vision`, ligada no `coleta_especialistas.bat`):** banner sem marca no destino/alt/arquivo,
+  fora da faixa de logos, sem `brands_seen` e com 300 px ou mais vai para `SYSTEM_FEATURED`
+  (`vision/advertiser.py`). Só marca escrita/logo com confiança alta ou média; nome da própria loja não vale.
+  Grava `featured_brand_source: "visao"` + evidência "lida na imagem"; cache `featured:<sha256>` no `vision.json`.
+  Nunca muda `ownership`. `summary.json`: `featured_by_vision`, `featured_needs_review`.
 - **Pipeline:** banner de especialista só casa com `elements.json` pela **imagem** (vários banners
   levam ao mesmo link) e, sem caixa na página renderizada, sai (variante do outro dispositivo).
 - **`summary.json`:** `featured_by_brand`, `featured_area_by_brand`, `featured_first_fold`.

@@ -168,3 +168,95 @@ def test_claude_vision_monta_o_pedido_e_trata_recusa():
     img, txt = sent["messages"][0]["content"]
     assert img["source"]["media_type"] == "image/webp" and "shopee" in txt["text"]
     assert ClaudeVision(client=client("refusal")).read(b"x", "image/webp", "") is None
+
+
+# ---------------------------------------------------------------------------
+# Varejo especialista (24/11/2026): marca em destaque lida no banner da propria loja
+# ---------------------------------------------------------------------------
+class FakeFeaturedReader(FakeReader):
+    def __init__(self, readings: List[Optional[VisualReading]]):
+        super().__init__([])
+        self.featured = list(readings)
+        self.contexts: List[str] = []
+
+    def read_featured(self, image_bytes: bytes, media_type: str, context: str) -> Optional[VisualReading]:
+        assert image_bytes and media_type.startswith("image/")
+        self.calls += 1
+        self.contexts.append(context)
+        return self.featured.pop(0)
+
+
+def _banner(i: int, **extra) -> Piece:
+    from shelfproof.models import BBox
+
+    e = {"image_file": f"img{i}.webp", "featured_brand": ""}
+    e.update(extra)
+    return Piece("leveros", "marketplace", "banner", "Leveros", "main-banner__image-container", title="banner sem texto",
+                 href="https://www.leveros.com.br/c/cupomtcl100",
+                 evidence=["banner da propria varejista: nenhum rotulo de patrocinio nem parametro de anuncio"],
+                 bbox=BBox(0, 200, 1366, 170, viewport_h=768), extra=e)
+
+
+def test_banner_da_loja_sem_marca_ganha_marca_lida_e_continua_da_loja(run_dir):
+    ps = [_banner(0), _banner(1), _banner(2), _banner(3)]
+    reader = FakeFeaturedReader([R("TCL"), R("Leveros"), R("Midea", conf="baixa"), R("", visible=False)])
+    st = resolve_unknown_advertisers(ps, run_dir, reader)
+    assert st["featured_candidates"] == 4 and st["featured_resolved"] == 1 and st["candidates"] == 0
+    tcl, own, low, none = ps
+    assert tcl.extra["featured_brand"] == "TCL" and tcl.extra["featured_brand_source"] == "visao"
+    assert any("lida na imagem" in e for e in tcl.evidence)
+    assert all(p.ownership == "marketplace" and p.advertiser == "Leveros" for p in ps)  # nunca vira pago
+    assert own.extra["featured_brand"] == ""   # o nome da propria loja nao e marca em destaque
+    assert low.extra["featured_brand"] == ""   # confianca baixa nao basta
+    assert none.extra["featured_brand"] == ""
+    assert "cupomtcl100" in reader.contexts[0] and "Leveros" in reader.contexts[0]
+    assert summarize(ps)["featured_by_brand"] == {"TCL": 1}
+
+
+def test_so_vai_para_a_visao_o_banner_sem_marca_e_grande(run_dir):
+    from shelfproof.models import BBox
+
+    ja_tem = _banner(0, featured_brand="Daikin", featured_brand_source="destino")
+    logo = _banner(1, logo_strip="1")
+    duas = _banner(2, brands_seen="LG, Samsung")
+    icone = _banner(3)
+    icone.bbox = BBox(0, 200, 140, 140, viewport_h=768)
+    reader = FakeFeaturedReader([])
+    st = resolve_unknown_advertisers([ja_tem, logo, duas, icone], run_dir, reader)
+    assert reader.calls == 0 and st["featured_candidates"] == 0
+    assert ja_tem.extra["featured_brand"] == "Daikin"
+
+
+def test_leitor_sem_read_featured_nao_le_banner_de_loja(run_dir):
+    reader = FakeReader([])
+    st = resolve_unknown_advertisers([_banner(0)], run_dir, reader)
+    assert reader.calls == 0 and st["featured_candidates"] == 0
+
+
+def test_banner_de_loja_usa_cache_proprio(run_dir):
+    p1, p2 = _banner(0), _banner(0)
+    reader = FakeFeaturedReader([R("Gree")])
+    resolve_unknown_advertisers([p1], run_dir, reader)
+    resolve_unknown_advertisers([p2], run_dir, reader)
+    assert reader.calls == 1 and p2.extra["featured_brand"] == "Gree"
+    cache = json.loads((run_dir / "vision.json").read_text(encoding="utf-8"))
+    assert all(k.startswith("featured:") for k in cache)
+
+
+def test_claude_vision_usa_o_prompt_do_varejo_no_banner_da_loja():
+    from types import SimpleNamespace
+
+    from shelfproof.vision.advertiser import SYSTEM, SYSTEM_FEATURED, ClaudeVision
+
+    sent = {}
+
+    class Msgs:
+        def parse(self, **kw):
+            sent.update(kw)
+            return SimpleNamespace(stop_reason="end_turn", stop_details=None, parsed_output=R("LG"))
+
+    cv = ClaudeVision(client=SimpleNamespace(beta=SimpleNamespace(messages=Msgs())))
+    assert cv.read_featured(b"x", "image/png", "Loja: Frigelar").advertiser == "LG"
+    assert sent["system"] == SYSTEM_FEATURED and "PROPRIA LOJA" in SYSTEM_FEATURED
+    cv.read(b"x", "image/png", "Marketplace: amazon")
+    assert sent["system"] == SYSTEM

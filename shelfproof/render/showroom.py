@@ -72,7 +72,8 @@ def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[st
                  "anunciante sem nome na página fica \"Não identificado\" ou é lido na própria peça.")
     if featured:
         notes.append("Banner da própria loja com marca em destaque: a marca vem do destino do clique (página da marca, "
-                     "busca ou filtro pela marca), do texto alternativo ou do nome do arquivo da peça. Não é contado como "
+                     "busca ou filtro pela marca), do texto alternativo ou do nome do arquivo da peça; sem nada disso, "
+                     "da leitura da própria peça (marca escrita ou logo visível, confiança alta ou média). Não é contado como "
                      "mídia paga: a página não traz rótulo de patrocínio. Acordo comercial (verba de trade) só a marca e a loja confirmam.")
     notes.append("Espaços pagos sem imagem salva entram no ranking e aparecem na prova como registro de código.")
     if empty_sites:

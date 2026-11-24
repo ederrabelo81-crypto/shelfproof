@@ -158,6 +158,9 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
         logger.info(f"visao: {st['resolved']}/{st['candidates']} anunciantes lidos na imagem "
                     f"({st['needs_review']} para conferir, {st['api_calls']} chamadas, {st['cached']} do cache, {st['no_image']} sem imagem, "
                     f"{st['errors']} erros)")
+        if st["featured_candidates"]:
+            logger.info(f"visao: {st['featured_resolved']}/{st['featured_candidates']} banners da loja com "
+                        f"marca em destaque lida na imagem")
 
     (run_dir / "pieces.json").write_text(
         json.dumps([p.to_dict() for p in pieces], ensure_ascii=False, indent=1), encoding="utf-8")
@@ -264,4 +267,7 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         "featured_by_brand": dict(sorted(featured.items(), key=lambda kv: -kv[1])),
         "featured_area_by_brand": {k: round(v) for k, v in sorted(featured_area.items(), key=lambda kv: -kv[1])},
         "featured_first_fold": dict(sorted(featured_fold.items(), key=lambda kv: -kv[1])),
+        "featured_by_vision": sum(1 for p in pieces if p.extra.get("featured_brand_source") == "visao"),
+        "featured_needs_review": [p.extra["featured_brand"] for p in pieces
+                                  if not p.is_paid and p.extra.get("featured_brand") and p.extra.get("needs_review")],
     }

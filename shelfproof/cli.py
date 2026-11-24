@@ -251,12 +251,12 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--carousel", type=float, default=24.0, help="segundos observando a 1a tela")
     c.add_argument("--headless", action="store_true", help="so com --engine launch (testes/CI)")
     c.add_argument("--out", default="runs")
-    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
+    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome e a marca dos banners de loja sem marca (Claude API)")
     c.set_defaults(fn=_cmd_capture)
 
     c = sub.add_parser("analyze", help="(re)classifica capturas ja feitas")
     c.add_argument("run_dirs", nargs="+")
-    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
+    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome e a marca dos banners de loja sem marca (Claude API)")
     c.set_defaults(fn=_cmd_analyze)
 
     c = sub.add_parser("detect-file", help="classifica um HTML salvo (Ctrl+S)")
@@ -293,7 +293,7 @@ def main(argv: List[str] | None = None) -> int:
     c.add_argument("--rebuild", action="store_true",
                    help="nao captura: so refaz o Showroom do dia (ex.: depois do review.json)")
     c.add_argument("--out", default="runs")
-    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome (Claude API)")
+    c.add_argument("--vision", action="store_true", help="le na imagem o anunciante das pagas sem nome e a marca dos banners de loja sem marca (Claude API)")
     c.set_defaults(fn=_cmd_event)
 
     c = sub.add_parser("today", help="data de hoje em BRT (AAAA-MM-DD), para os scripts")

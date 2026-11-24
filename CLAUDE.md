@@ -52,6 +52,8 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
    categoria ou pela cor do banner. Quem resolve é a leitura visual (fase 3,
    `shelfproof/vision/`), e só com marca escrita/logo visível e confiança alta ou
    média, gravada em `evidence` como "lido na imagem". A visão nunca cria peça paga.
+   No varejo especialista ela também lê a marca em destaque do banner da loja sem marca no
+   link/alt/arquivo (`featured_brand_source: "visao"`); o banner continua da loja.
 3. **Sessão anônima limpa por padrão.** Home logada é personalizada (no 11.11, o
    histórico do usuário fez ar-condicionado dominar Amazon e ML). Persona logada
    (`--session profile`) é uma coleta **separada** e sempre rotulada.
@@ -123,7 +125,7 @@ python -m shelfproof event --list                           # capturas do dia; t
 
 # Varejo especialista em ar-condicionado (11 homes: Frigelar, Dufrio, Leveros...). Pasta propria,
 # para nao somar com o Showroom dos marketplaces no mesmo dia. Sem pago: "Marcas em destaque".
-python -m shelfproof event --targets config/targets_especialistas.json --out runs/especialistas --event "Black Friday - Especialistas"
+python -m shelfproof event --targets config/targets_especialistas.json --out runs/especialistas --event "Black Friday - Especialistas" --vision
 ```
 
 Windows (PC coletor): `scripts\instalar.bat` uma vez (venv próprio, não o do RAC — COMMON_MISTAKES S16).

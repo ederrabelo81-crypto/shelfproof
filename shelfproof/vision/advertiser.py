@@ -6,12 +6,16 @@ na peca grafica.
 
 O que esta leitura PODE fazer:
   * dar nome a uma peca que o detector ja marcou como ``paid`` e deixou
-    ``Nao identificado``, gravando em ``evidence`` o texto/logo que a sustenta.
+    ``Nao identificado``, gravando em ``evidence`` o texto/logo que a sustenta;
+  * dizer a marca em destaque de um banner da propria loja no varejo especialista
+    (``extra.featured_brand`` vazio: sem marca no destino, no alt nem no arquivo).
+    O banner continua da loja: a leitura nao o torna pago (24/11/2026).
 
 O que ela NUNCA faz (regras duras 1 e 2 do CLAUDE.md):
   * transformar peca em paga: pago continua exigindo marcador no HTML;
   * trocar um anunciante que o HTML ja revelou;
-  * aceitar palpite: sem marca visivel, ou confianca baixa, fica ``Nao identificado``.
+  * aceitar palpite: sem marca visivel, ou confianca baixa, fica ``Nao identificado``
+    (no banner da loja, fica sem marca em destaque).
 
 Cada leitura fica em ``<run_dir>/vision.json`` (chave = sha256 da imagem), entao
 reanalisar uma captura nao paga a API de novo e a leitura vira evidencia auditavel.
@@ -32,6 +36,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from shelfproof.detect.brands import find_brand
+from shelfproof.detect.rules import MARKETPLACE_NAMES, SPECIALISTS
 from shelfproof.models import UNKNOWN_ADVERTISER, Piece
 
 DEFAULT_MODEL = "claude-opus-5-5"
@@ -40,6 +45,9 @@ API_MEDIA_TYPES = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp
 MAX_SIDE = 1568  # acima disso a API reduz a imagem de qualquer jeito
 MARKETPLACE_SELF = {"amazon", "mercado livre", "mercadolivre", "magalu", "magazine luiza",
                     "casas bahia", "shopee"}
+# nome da propria loja especialista tambem nao e marca em destaque
+SELF_NAMES = {n.lower() for _h, n, _c in SPECIALISTS.values()} | {k for k in SPECIALISTS} | \
+             {"friopecas", "web continental", "climario", "central ar", "centralar.com", "ar certo"}
 
 SYSTEM = """Voce audita pecas de midia paga (retail media) capturadas em home pages de \
 marketplaces brasileiros. O detector ja provou pelo HTML que a peca e um espaco PAGO, mas o \
@@ -60,6 +68,29 @@ Regras:
 - confidence: "alta" = nome/logo legivel sem ambiguidade; "media" = legivel mas pequeno ou parcial;
   "baixa" = duvida real. Na duvida, "baixa".
 - people_present: true se a peca mostra o rosto de uma pessoa real (modelo, artista, apresentador).
+  Isso so alimenta a revisao humana de direitos de imagem; nao identifique quem e."""
+
+
+SYSTEM_FEATURED = """Voce audita banners da HOME de lojas brasileiras especialistas em \
+ar-condicionado (Frigelar, Dufrio, Leveros...). Estes banners sao da PROPRIA LOJA, nao sao midia \
+paga. O HTML nao diz qual marca o banner destaca. Sua tarefa e dizer qual MARCA de fabricante \
+(Midea, LG, Samsung, TCL, Daikin, Gree, Elgin...) o banner destaca.
+
+Regras:
+- So responda uma marca se ela estiver ESCRITA ou com o LOGOTIPO visivel na imagem. Leia; nao deduza.
+- Nao deduza a marca pelo formato do aparelho, pela cor, pela categoria ou pelo estilo.
+- advertiser e a MARCA do fabricante, nao o modelo ("WindFree" -> "Samsung"; "BreezeIN" -> "TCL";
+  "Dual Inverter" sem logo nao basta).
+- O nome ou logo da propria loja (Frigelar, Dufrio, Leveros, Poloar, Clima Rio, CentralAr, Denteck,
+  ArCerto, Friopecas, WebContinental, Refricril) NAO e a marca em destaque.
+- Banner de campanha da loja (Black Friday, cupom, frete, parcelamento) sem marca de fabricante
+  escrita ou com logo: brand_visible=false.
+- Varias marcas com o mesmo peso (ex.: "LG, Samsung e Midea com desconto"): brand_visible=false.
+  So responda uma se ela assina ou domina a peca (logo principal, produto unico em destaque).
+- text_seen: copie literalmente o texto ou descreva o logotipo que sustenta a resposta.
+- confidence: "alta" = nome/logo legivel sem ambiguidade; "media" = legivel mas pequeno ou parcial;
+  "baixa" = duvida real. Na duvida, "baixa".
+- people_present: true se o banner mostra o rosto de uma pessoa real (modelo, artista, apresentador).
   Isso so alimenta a revisao humana de direitos de imagem; nao identifique quem e."""
 
 
@@ -91,10 +122,17 @@ class ClaudeVision:
             self.client = anthropic.Anthropic()
 
     def read(self, image_bytes: bytes, media_type: str, context: str) -> Optional[VisualReading]:
+        return self._read(SYSTEM, image_bytes, media_type, context)
+
+    def read_featured(self, image_bytes: bytes, media_type: str, context: str) -> Optional[VisualReading]:
+        """Marca em destaque num banner da propria loja (varejo especialista)."""
+        return self._read(SYSTEM_FEATURED, image_bytes, media_type, context)
+
+    def _read(self, system: str, image_bytes: bytes, media_type: str, context: str) -> Optional[VisualReading]:
         resp = self.client.beta.messages.parse(
             model=self.model,
             max_tokens=4000,
-            system=SYSTEM,
+            system=system,
             # recusa do classificador de seguranca: o pedido e refeito em outro modelo, na mesma chamada
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
@@ -146,9 +184,28 @@ def accept(reading: VisualReading, marketplace: str) -> Optional[str]:
     name = (reading.advertiser or "").strip()
     if not (reading.brand_visible and name and reading.confidence in ACCEPTED_CONFIDENCE):
         return None
-    if name.lower() in MARKETPLACE_SELF or name.lower() == marketplace.lower():
-        return None  # "a peca e da Amazon" nao responde quem pagou
+    own = {marketplace.lower(), MARKETPLACE_NAMES.get(marketplace, "").lower(),
+           MARKETPLACE_NAMES.get(marketplace, "").lower().replace("ç", "c")}
+    if name.lower() in MARKETPLACE_SELF or name.lower() in own or name.lower() in SELF_NAMES:
+        return None  # "a peca e da Amazon" / "o banner e da Frigelar" nao responde a marca
     return find_brand(name) or name
+
+
+def _featured_context(p: Piece) -> str:
+    parts = [f"Loja: {MARKETPLACE_NAMES.get(p.marketplace, p.marketplace)}", f"Slot: {p.slot or '-'}"]
+    if p.alt:
+        parts.append(f"Alt no HTML: {p.alt[:140]}")
+    if p.href:
+        parts.append(f"Destino do clique: {p.href[:160]}")
+    parts.append("Qual marca de fabricante este banner da loja destaca?")
+    return "\n".join(parts)
+
+
+def is_featured_candidate(p: Piece, min_width: float = 300.0) -> bool:
+    """Banner de especialista sem marca em destaque, grande o bastante para ser vitrine."""
+    return (p.marketplace in SPECIALISTS and not p.is_paid and not p.extra.get("featured_brand")
+            and not p.extra.get("logo_strip") and not p.extra.get("brands_seen")
+            and not (p.bbox is not None and p.bbox.w < min_width))
 
 
 def is_known_brand(name: str) -> bool:
@@ -171,12 +228,19 @@ def resolve_unknown_advertisers(pieces: List[Piece], run_dir: Path, reader: Visi
     """
     run_dir = Path(run_dir)
     cache = _load_cache(run_dir)
-    stats = dict(candidates=0, api_calls=0, cached=0, resolved=0, needs_review=0, no_image=0, errors=0)
+    stats = dict(candidates=0, api_calls=0, cached=0, resolved=0, needs_review=0, no_image=0, errors=0,
+                 featured_candidates=0, featured_resolved=0)
     model_label = model_label or getattr(reader, "model", "") or "visao"
+    featured_reader = getattr(reader, "read_featured", None)
     for p in pieces:
+        featured = False
         if not (p.is_paid and p.advertiser == UNKNOWN_ADVERTISER):
-            continue
-        stats["candidates"] += 1
+            if featured_reader is None or not is_featured_candidate(p):
+                continue
+            featured = True
+            stats["featured_candidates"] += 1
+        else:
+            stats["candidates"] += 1
         img_file = p.extra.get("image_file")
         path = run_dir / "images" / img_file if img_file else None
         if path is None or not path.exists():
@@ -189,12 +253,15 @@ def resolve_unknown_advertisers(pieces: List[Piece], run_dir: Path, reader: Visi
             logger.warning(f"visao: nao abri {path.name}: {exc}")
             continue
         key = hashlib.sha256(data).hexdigest()
+        if featured:  # outra pergunta (outro prompt) sobre a mesma imagem: outra entrada no cache
+            key = "featured:" + key
         entry = cache.get(key)
         if entry is not None:
             stats["cached"] += 1
         else:
             try:
-                reading = reader.read(data, media_type, _context(p))
+                reading = (featured_reader(data, media_type, _featured_context(p)) if featured
+                           else reader.read(data, media_type, _context(p)))
             except Exception as exc:  # erro de API: a peca fica como estava, as outras seguem
                 stats["errors"] += 1
                 logger.warning(f"visao: falhou em {path.name}: {type(exc).__name__}: {exc}")
@@ -207,6 +274,20 @@ def resolve_unknown_advertisers(pieces: List[Piece], run_dir: Path, reader: Visi
         if reading and reading.people_present:
             p.extra["people_present"] = "sim"
         name = accept(reading, p.marketplace) if reading else None
+        if featured:
+            if name:
+                # o banner continua da loja (ownership intocado): so ganha a marca em destaque
+                p.extra["featured_brand"] = name
+                p.extra["featured_brand_source"] = "visao"
+                if not is_known_brand(name):
+                    p.extra["needs_review"] = "marca fora do dicionario: confirmar e incluir em brands.py"
+                    stats["needs_review"] += 1
+                p.evidence.append(f"marca em destaque: {name} (lida na imagem: '{reading.text_seen[:80]}', "
+                                  f"{entry['model']}, confianca {reading.confidence})")
+                stats["featured_resolved"] += 1
+            elif reading:
+                p.evidence.append(f"leitura visual sem marca em destaque confiavel (confianca {reading.confidence})")
+            continue
         if name:
             p.advertiser = name
             p.extra["advertiser_source"] = "vision"
