@@ -218,3 +218,13 @@ destaque"), separado de "Quem pagou".
 **Certo:** clone = mesmo slot + mesma imagem, ignorando só os parâmetros de tamanho (`_dedupe_specialist`);
 no pipeline, `_src_key` lê o arquivo do parâmetro `url` do Next.js.
 
+### S24. Só ver o que a regra do site conhece (25/11/2026)
+**Errado:** peça só existia se uma regra por site a reconhecesse (carrossel, slot de anúncio). O Showroom
+listava marca em destaque sem a peça, e pop-up de cupom, banner do meio da página, lateral e iframe de
+rede de anúncio ficavam de fora. Pior: `dismiss_overlays` fechava janelas sem fotografar.
+**Certo:** leitura da página como um cliente (`reading.py` + `creatives.json` + `popups/`): todo criativo
+visível vira peça com a zona; pop-up é fotografado antes de fechar. Pago continua exigindo marcador.
+**Cuidado já pago no ensaio:** widget de acessibilidade (VLibras) é camada fixa de tela cheia e
+transparente; seletor de idioma da Shopee é janela utilitária; card de produto da Clima Rio tem o preço
+longe da imagem no DOM (filtrar também por link `/p` e imagem `/arquivos/ids/`).
+

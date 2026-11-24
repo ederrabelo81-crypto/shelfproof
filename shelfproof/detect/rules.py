@@ -491,7 +491,7 @@ def _slug_text(u: str) -> str:
     return _SEP.sub(" ", unquote(u or "")).strip()
 
 
-def _specialist_brand(href: str, alt: str, src: str) -> "tuple[str, str, List[str]]":
+def creative_brand(href: str, alt: str, src: str) -> "tuple[str, str, List[str]]":
     """Marca em destaque no banner, pela ordem de forca da evidencia: destino do clique, texto
     alternativo, nome do arquivo da peca. Mais de uma marca na mesma fonte = sem destaque unico."""
     p = urlparse(href or "")
@@ -508,6 +508,9 @@ def _specialist_brand(href: str, alt: str, src: str) -> "tuple[str, str, List[st
         if len(found) > 1:
             return "", source, found
     return "", "", []
+
+
+_specialist_brand = creative_brand  # nome antigo (testes de 24/11/2026)
 
 
 def _specialist(key: str) -> Callable[[BeautifulSoup], List[Piece]]:
@@ -544,7 +547,7 @@ def _specialist(key: str) -> Callable[[BeautifulSoup], List[Piece]]:
             # faixa de logos (navegacao por marca), pela classe ou pela pasta do arquivo (Leveros:
             # /upload/menu/b2c-home-slider-brands/): logo pequeno nao e banner de destaque
             logo_strip = bool(_slot_name(tokens, _LOGO_STRIP_CTX)) or bool(_LOGO_STRIP_SRC.search(src))
-            brand, source, seen = _specialist_brand(href, alt, src)
+            brand, source, seen = creative_brand(href, alt, src)
             evidence = ["banner da propria varejista: nenhum rotulo de patrocinio nem parametro de anuncio"]
             extra: Dict[str, str] = {"featured_brand": brand, "needs_box": "1"}
             if brand:

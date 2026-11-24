@@ -131,6 +131,20 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
         pieces = [p for p in pieces if not (p.extra.get("needs_box") and p.bbox is None)]
     for p in pieces:
         p.extra.pop("needs_box", None)
+
+    # leitura da pagina como um cliente (25/11/2026): pop-up, meio da pagina, lateral, barra fixa,
+    # iframe de anuncio... tudo o que apareceu e nenhuma regra cobriu
+    from shelfproof.detect.rules import identify_marketplace
+    from shelfproof.reading import materialize_images, read_page
+
+    try:
+        mkt = manifest.get("marketplace") or identify_marketplace(html, base)
+        extra_pieces = read_page(run_dir, pieces, manifest, mkt, images, _src_key)
+        materialize_images(extra_pieces, run_dir, manifest)
+        pieces += extra_pieces
+    except Exception as exc:  # a leitura nunca derruba as pecas das regras
+        logger.warning(f"leitura da pagina: {exc}")
+    for p in pieces:
         p.extra.pop("src_candidates", None)
 
     # espaco pago sem imagem com caixa conhecida (Amazon adplacements em iframe): recorta do print
@@ -252,6 +266,9 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         featured_area[fb] += p.bbox.area if p.bbox else 0.0
         if p.bbox and p.bbox.fold == 1:
             featured_fold[fb] += 1
+    zones: Dict[str, int] = defaultdict(int)
+    for p in pieces:
+        zones[p.extra.get("zone") or "regra do site"] += 1
     total_area = sum(area_owner.values()) or 1.0
     return {
         "pieces": len(pieces),
@@ -267,6 +284,9 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         "featured_by_brand": dict(sorted(featured.items(), key=lambda kv: -kv[1])),
         "featured_area_by_brand": {k: round(v) for k, v in sorted(featured_area.items(), key=lambda kv: -kv[1])},
         "featured_first_fold": dict(sorted(featured_fold.items(), key=lambda kv: -kv[1])),
+        "by_zone": dict(sorted(zones.items(), key=lambda kv: -kv[1])),
+        "found_by_page_reading": sum(1 for p in pieces if p.extra.get("found_by") == "leitura_da_pagina"),
+        "popups": sum(1 for p in pieces if p.extra.get("zone") == "pop-up"),
         "featured_by_vision": sum(1 for p in pieces if p.extra.get("featured_brand_source") == "visao"),
         "featured_needs_review": [p.extra["featured_brand"] for p in pieces
                                   if not p.is_paid and p.extra.get("featured_brand") and p.extra.get("needs_review")],

@@ -7,6 +7,9 @@ Gera uma pasta ``runs/<data>/<marketplace>_<device>_<sessao>_<HHMM>/`` com:
     page.html       DOM renderizado depois da rolagem (entrada do detector)
     elements.json   toda <img>: src real, alt, link, caixa na pagina, rotulos
     slots.json      caixa dos espacos de anuncio sem <img> (Amazon adplacements), para recortar do full.jpg
+    creatives.json  leitura da pagina: todo criativo visivel (img, fundo CSS, video, iframe), fixo ou nao
+    popups/         print de cada janela por cima da pagina, antes de fechar (manifest "popups")
+    viewport_top.jpg 1a tela no fim da captura: recorte do que e fixo (lateral, barra)
     full.jpg        print da pagina inteira
     frames/         prints da 1a tela a cada N s (rotacao do carrossel)
     images/         bytes das imagens que o navegador baixou (o criativo real)
@@ -158,6 +161,112 @@ SLOTS_JS = r"""
   return out;
 }
 """
+
+
+# Leitura da pagina como um cliente (25/11/2026): TODO criativo visivel, nao so o que uma regra por
+# site reconhece. Pop-up, banner do meio da pagina, lateral/vertical, barra fixa, video, iframe de
+# rede de anuncio e fundo CSS. O pipeline (shelfproof/reading.py) decide o que vira peca.
+CREATIVES_JS = r"""
+() => {
+  const vw = window.innerWidth, vh = window.innerHeight, sx = window.scrollX, sy = window.scrollY;
+  const AD_HOST = /doubleclick|googlesyndication|googleadservices|adservice\.google|criteo|adnxs|amazon-adsystem|rtbhouse|taboola|outbrain|teads|smartadserver|adform|media\.net|pubmatic|rubicon|openx|mercadoads|ads\.mercadolivre/i;
+  const AD_ID = /div-gpt-ad|google_ads_iframe|gpt-ad|aswift_/i;
+  const LABEL = /^(patrocinad[oa]s?|publicidade|an[uú]ncio|sponsored)$/i;
+  const PRICE = /R\$\s?\d/;
+  const out = [], seen = new Set();
+  const fixedOf = (el) => { for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+    const p = getComputedStyle(n).position; if (p === 'fixed' || p === 'sticky') return p; } return ''; };
+  const hiddenOf = (el) => { let op = 1; for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+    const cs = getComputedStyle(n); op *= parseFloat(cs.opacity || '1');
+    if (cs.visibility === 'hidden' || cs.display === 'none') return true; } return op <= 0.05; };
+  // card de produto: um ancestral proximo, nao muito maior que a imagem, com preco no texto
+  const inCard = (el, r) => { let n = el; for (let k = 0; k < 5 && n; k++) { n = n.parentElement; if (!n) break;
+    const b = n.getBoundingClientRect(); if (b.width * b.height > 4 * r.width * r.height + 40000) break;
+    if (PRICE.test(n.innerText || '')) return true; } return false; };
+  const ctxOf = (el) => { const c = []; for (let n = el, k = 0; n && k < 8; n = n.parentElement, k++) {
+    if (typeof n.className === 'string' && n.className) c.push(n.className.slice(0, 80)); if (n.id) c.push('#' + n.id.slice(0, 40)); }
+    return c.join(' ').slice(0, 400); };
+  const labelOf = (el) => { let n = el; for (let k = 0; k < 4 && n; k++) { n = n.parentElement; if (!n) break;
+    for (const t of n.querySelectorAll('span,div,p,small,b')) { const s = (t.textContent || '').trim();
+      if (s.length < 14 && LABEL.test(s)) return s; } } return ''; };
+  const push = (el, kind, src) => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 100 || r.height < 60) return;
+    const fx = fixedOf(el);
+    const x = r.left + (fx === 'fixed' ? 0 : sx), y = r.top + (fx === 'fixed' ? 0 : sy);
+    const key = kind + '|' + src + '|' + Math.round(x) + '|' + Math.round(y);
+    if (seen.has(key)) return; seen.add(key);
+    const a = el.closest('a');
+    const ids = ctxOf(el);
+    out.push({kind, src, href: a ? a.href : '',
+      alt: (el.getAttribute('alt') || el.getAttribute('title') || el.getAttribute('aria-label') || '').slice(0, 160),
+      text: ((a || el.parentElement || el).innerText || '').trim().replace(/\s+/g, ' ').slice(0, 160),
+      x, y, w: r.width, h: r.height, vx: r.left, vy: r.top, fixed: fx, hidden: hiddenOf(el),
+      in_card: inCard(el, r), label: labelOf(el),
+      ad_host: (kind === 'iframe' && AD_HOST.test(src)) ? src.match(AD_HOST)[0] : '',
+      ad_id: (AD_ID.exec(ids + ' #' + (el.id || '')) || [''])[0], ctx: ids,
+      in_popup: !!el.closest('[data-shelfproof-popup]')});
+  };
+  document.querySelectorAll('img').forEach((el) => push(el, 'img', el.currentSrc || el.src || ''));
+  document.querySelectorAll('video').forEach((el) => push(el, 'video', el.poster || el.currentSrc || ''));
+  document.querySelectorAll('iframe').forEach((el) => push(el, 'iframe', el.src || ''));
+  document.querySelectorAll('body *').forEach((el) => {
+    if (/^(IMG|VIDEO|IFRAME|CANVAS|SCRIPT|STYLE|SVG|PATH)$/i.test(el.tagName)) return;
+    const m = (getComputedStyle(el).backgroundImage || '').match(/url\(["']?(https?:[^"')]+)["']?\)/);
+    if (m) push(el, 'background', m[1]);
+  });
+  return {viewport: {w: vw, h: vh}, scroll: {x: sx, y: sy}, items: out};
+}
+"""
+
+# Janela por cima da pagina (pop-up de cupom, newsletter, roleta, aviso): posicao fixa, na frente e
+# grande, ou role=dialog. Marca cada uma com data-shelfproof-popup para o print e o "Fechar".
+POPUPS_JS = r"""
+() => {
+  const vw = window.innerWidth, vh = window.innerHeight, out = [];
+  const CONSENT = /cookie|privacidade|lgpd|consentimento|pol[ií]tica de dados/i;
+  // janela utilitaria, nao e peca: idioma (Shopee), acessibilidade (VLibras na Dufrio), chat, CEP
+  const UTILITY = /selecione seu idioma|select (your )?language|libras|acessibilidade|recursos assistivos|whatsapp|atendimento online|chat|informe seu cep|digite seu cep|alterar cep/i;
+  // camada de tela cheia transparente (widget) nao e janela: precisa de fundo solido ou imagem grande
+  const solid = (el) => { for (const n of [el, ...el.querySelectorAll(':scope > *, :scope > * > *')]) {
+    const r = n.getBoundingClientRect(); if (r.width < 200 || r.height < 120) continue;
+    const m = (getComputedStyle(n).backgroundColor || '').match(/rgba?\(([^)]+)\)/);
+    const al = m ? (m[1].split(',')[3] === undefined ? 1 : parseFloat(m[1].split(',')[3])) : 0;
+    if (al > 0.5 || getComputedStyle(n).backgroundImage !== 'none') return true; }
+    return [...el.querySelectorAll('img,iframe,video')].some((m) => { const r = m.getBoundingClientRect(); return r.width >= 200 && r.height >= 120; }); };
+  const cands = new Set(document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]'));
+  for (const el of document.querySelectorAll('body *')) {
+    const cs = getComputedStyle(el);
+    if (cs.position !== 'fixed') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width * r.height >= 0.12 * vw * vh) cands.add(el);
+  }
+  let i = 0;
+  for (const el of cands) {
+    const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity || '1') < 0.1) continue;
+    if (r.width < 200 || r.height < 120 || r.bottom <= 0 || r.top >= vh) continue;
+    // o cabecalho fixo do site nao e janela: fica no topo, baixo e da largura da tela
+    if (r.top <= 2 && r.height < vh * 0.3 && r.width > vw * 0.9) continue;
+    // contêiner dentro de outra janela ja vista: fica a de fora
+    if ([...cands].some((o) => o !== el && o.contains(el) && getComputedStyle(o).display !== 'none' && o.getBoundingClientRect().width >= r.width)) continue;
+    const text = (el.innerText || '').trim().replace(/\s+/g, ' ');
+    if (!text && !el.querySelector('img,iframe,video')) continue;
+    if (!solid(el)) continue;
+    el.setAttribute('data-shelfproof-popup', String(i));
+    const imgs = [...el.querySelectorAll('img')].map((m) => m.currentSrc || m.src).filter(Boolean).slice(0, 5);
+    const a = el.querySelector('a[href]');
+    out.push({id: i++, x: Math.max(0, r.left), y: Math.max(0, r.top), w: Math.min(r.width, vw), h: Math.min(r.height, vh),
+              text: text.slice(0, 300), imgs, href: a ? a.href : '', consent: CONSENT.test(text.slice(0, 600)),
+              utility: UTILITY.test(text.slice(0, 600)),
+              role: el.getAttribute('role') || el.tagName.toLowerCase()});
+  }
+  return out;
+}
+"""
+
+# "Fechar" de uma janela de marketing, como o cliente faz. So dentro da janela detectada, e so nomes exatos.
+POPUP_CLOSE = re.compile(r"^\s*(fechar|close|x|×|✕|n[aã]o,? obrigad[oa]|agora n[aã]o|continuar comprando|pular)\s*$", re.I)
 
 
 @dataclass
@@ -708,6 +817,48 @@ def dismiss_overlays(page: Any, passes: int = 2, skip: Iterable[str] = ()) -> Li
     return clicked
 
 
+def capture_popups(page: Any, run_dir: Path, moment: str, seen: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fotografa as janelas por cima da pagina ANTES de fechar (sao pecas: cupom, roleta, campanha).
+
+    Aviso de cookies tambem e registrado (``consent``), mas nao vira peca. Janela de marketing e
+    fechada pelo "Fechar"/"X" de dentro dela, como o cliente faz; nunca login nem captcha.
+    """
+    out: List[Dict[str, Any]] = []
+    try:
+        found = page.evaluate(POPUPS_JS)
+    except Exception as exc:
+        logger.warning(f"[capture] pop-ups ({moment}): {exc}")
+        return out
+    (run_dir / "popups").mkdir(exist_ok=True)
+    for pop in found:
+        sig = (pop.get("text", "")[:120], tuple(pop.get("imgs", [])[:2]))
+        if any((x.get("text", "")[:120], tuple(x.get("imgs", [])[:2])) == sig for x in seen + out):
+            continue
+        n = len(seen) + len(out) + 1
+        rec = dict(pop, moment=moment, file="")
+        try:
+            f = run_dir / "popups" / f"popup_{n:02d}.jpg"
+            page.screenshot(path=str(f), type="jpeg", quality=85,
+                            clip={"x": pop["x"], "y": pop["y"], "width": pop["w"], "height": pop["h"]})
+            rec["file"] = f"popups/{f.name}"
+        except Exception as exc:
+            rec["error"] = str(exc)[:200]
+        if not (pop.get("consent") or pop.get("utility")):
+            try:
+                root = page.locator(f'[data-shelfproof-popup="{pop["id"]}"]')
+                btn = root.get_by_role("button", name=POPUP_CLOSE)
+                if btn.count() == 0:
+                    btn = root.locator('[aria-label="Fechar" i], [aria-label="Close" i], [title="Fechar" i]')
+                if btn.count() > 0 and btn.first.is_visible():
+                    btn.first.click(timeout=2000)
+                    rec["closed"] = True
+                    time.sleep(random.uniform(0.6, 1.2))
+            except Exception as exc:
+                rec["close_error"] = str(exc)[:160]
+        out.append(rec)
+    return out
+
+
 def _frames(page: Any) -> List[Any]:
     """A pagina e os iframes que podem ser uma janela por cima dela: grandes e na tela.
 
@@ -904,6 +1055,10 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
                 errors.append(f"desktop redirecionado para o site de celular: {page.url}")
 
         stage("overlays")
+        popups: List[Dict[str, Any]] = []
+        manifest["popups"] = popups
+        # 0a) janela de campanha/cupom por cima da home: e peca. Fotografar ANTES de fechar.
+        popups += capture_popups(page, run_dir, "abertura", popups)
         # 0) janelas por cima da vitrine (idioma da Shopee, aviso de cookies): fechar como um cliente
         try:
             manifest["dismissed"] = dismiss_overlays(page)
@@ -932,6 +1087,7 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         stage("scroll")
         # 2) rolar ate o fim para carregar o lazy-load. Antes, fechar de novo: janela que carrega
         # por ultimo (pesquisa da Magalu, lazyOnload) aparece depois da 1a tentativa.
+        popups += capture_popups(page, run_dir, "depois do carrossel", popups)
         try:
             prev = manifest.get("dismissed", [])
             manifest["dismissed"] = prev + dismiss_overlays(page, skip=prev)
@@ -943,6 +1099,8 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             manifest["script_scrolls"] = st.get("script_scrolls", 0)
         except Exception as exc:
             errors.append(f"scroll: {exc}")
+        # janela que abre com a rolagem (cupom de saida, newsletter)
+        popups += capture_popups(page, run_dir, "durante a rolagem", popups)
 
         stage("artifacts")
         # 3) artefatos, cada um no seu try
@@ -966,6 +1124,17 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
         except Exception as exc:
             errors.append(f"slots.json: {exc}")
         try:
+            # leitura da pagina: todo criativo visivel (pop-up, meio da pagina, lateral, iframe de anuncio...)
+            creatives = page.evaluate(CREATIVES_JS)
+            (run_dir / "creatives.json").write_text(json.dumps(creatives, ensure_ascii=False), encoding="utf-8")
+        except Exception as exc:
+            errors.append(f"creatives.json: {exc}")
+        try:
+            # 1a tela com o que esta fixo (barra lateral, rodape fixo): o recorte dos criativos "fixed"
+            page.screenshot(path=str(run_dir / "viewport_top.jpg"), type="jpeg", quality=80)
+        except Exception as exc:
+            errors.append(f"viewport_top.jpg: {exc}")
+        try:
             page.screenshot(path=str(run_dir / "full.jpg"), full_page=True, type="jpeg", quality=70)
         except Exception as exc:
             errors.append(f"full.jpg: {exc}")
@@ -977,6 +1146,13 @@ def capture(cfg: CaptureConfig) -> CaptureResult:
             manifest["image_bodies"] = sink.flush()
             stage("refetch")
             visible_srcs = [e["src"] for e in elements if e.get("w", 0) >= 120 and e.get("h", 0) >= 60]
+            try:  # fundo CSS e poster de video da leitura da pagina tambem sao criativos
+                cr = json.loads((run_dir / "creatives.json").read_text(encoding="utf-8"))
+                visible_srcs += [c["src"] for c in cr.get("items", [])
+                                 if c.get("kind") in ("background", "video") and c.get("src", "").startswith("http")
+                                 and c.get("w", 0) >= 200 and c.get("h", 0) >= 80]
+            except Exception:
+                pass
             refetched = sink.fetch_missing(ctx.request, visible_srcs)
             manifest["images_refetched"] = refetched
         except Exception as exc:

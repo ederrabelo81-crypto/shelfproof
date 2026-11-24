@@ -10,6 +10,7 @@ shelf-proof/
 │   ├── cli.py / __main__.py      # capture | analyze | detect-file | showroom | contact-sheet | event
 │   ├── rounds.py                 # coleta do dia em rodadas: rounds.json -> Showroom do dia
 │   ├── pipeline.py               # captura -> pieces.json + summary.json (caixa, dobra, imagem, tempo no ar)
+│   ├── reading.py                # leitura da página: criativo que nenhuma regra cobriu (pop-up, lateral, meio...)
 │   ├── browser/                  # VENDORIZADO do RAC: playwright_runtime + local_browser (+ new_isolated_context)
 │   ├── collect/capture.py        # robô: abre, observa carrossel, rola, salva print/HTML/imagens/elements
 │   ├── detect/

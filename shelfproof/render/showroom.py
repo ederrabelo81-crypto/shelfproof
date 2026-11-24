@@ -124,7 +124,7 @@ def _air(s: str) -> tuple:
 
 def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, date_label: str,
                     logo_dir: Optional[Path] = None, review: Optional[Dict[str, List[str]]] = None,
-                    max_per_site: int = 18) -> Path:
+                    max_per_site: int = 40) -> Path:
     """Monta dados + imagens a partir de runs ja analisadas (pieces.json) e renderiza.
 
     Varias capturas do mesmo site e dispositivo (rodadas do dia) viram UMA tela: a peca vista em

@@ -53,7 +53,8 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
    `shelfproof/vision/`), e só com marca escrita/logo visível e confiança alta ou
    média, gravada em `evidence` como "lido na imagem". A visão nunca cria peça paga.
    No varejo especialista ela também lê a marca em destaque do banner da loja sem marca no
-   link/alt/arquivo (`featured_brand_source: "visao"`); o banner continua da loja.
+   link/alt/arquivo (`featured_brand_source: "visao"`); o banner continua da loja. O mesmo vale
+   para as peças da leitura da página (pop-up, lateral, meio da página: `shelfproof/reading.py`).
 3. **Sessão anônima limpa por padrão.** Home logada é personalizada (no 11.11, o
    histórico do usuário fez ar-condicionado dominar Amazon e ML). Persona logada
    (`--session profile`) é uma coleta **separada** e sempre rotulada.

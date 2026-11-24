@@ -122,6 +122,26 @@ homes renderizadas (desktop, anônimo); fixtures em `tests/fixtures/homes_2026-1
 - **Cookies:** "Concordar" (Frigelar), "OK, ENTENDI." (ArCerto), "Aceitar" (Poloar, CentralAr) —
   `capture.OVERLAY_BUTTONS`.
 
+## Leitura da página (todo site, 25/11/2026)
+Além das regras por site, o robô lê a página como um cliente (`shelfproof/reading.py`): todo criativo
+visível que nenhuma regra cobriu vira peça, com a **zona** em que apareceu.
+- **Captura:** `creatives.json` (img, fundo CSS, vídeo, iframe; posição fixa/sticky; dentro de card de
+  produto?; rótulo; rede de anúncio), `popups/` (cada janela por cima da página fotografada **antes** de
+  fechar, na abertura, depois do carrossel e durante a rolagem) e `viewport_top.jpg` (recorte do que é fixo).
+- **Zonas:** `pop-up`, `barra fixa`, `lateral fixa`, `lateral` (vertical na borda), `topo` (1ª tela),
+  `faixa larga`, `meio da pagina`, `carrossel` (slide fora da tela).
+- **Fora:** card de produto (preço junto, link `/p`, imagem `/arquivos/ids/`, classe product/poly-card),
+  ícone e logo pequenos, escondido, iframe sem marca de anúncio (mapa, YouTube, chat), o que já está
+  numa janela, e a mesma imagem/caixa que uma regra já leu.
+- **Pop-up utilitário não é peça:** cookies (`consent`), idioma, acessibilidade (VLibras), chat, CEP
+  (`utility`). Camada transparente de tela cheia (widget) não é janela: precisa de fundo sólido ou imagem.
+  Janela de campanha é fechada pelo "Fechar"/"X" de dentro dela (`POPUP_CLOSE`), como o cliente faz.
+- **Pago** só com marcador: iframe de rede de anúncio (doubleclick, criteo, amazon-adsystem...), slot GPT
+  (`div-gpt-ad`) ou rótulo "Patrocinado/Publicidade". O resto é da própria loja, com marca em destaque
+  (destino/alt/arquivo; sem isso, leitura visual com `--vision`).
+- **Imagem:** a baixada; sem ela (iframe, vídeo, fixo), recorte do `full.jpg`/`viewport_top.jpg` pela caixa.
+- **`summary.json`:** `by_zone`, `found_by_page_reading`, `popups`.
+
 ## Qualquer outro site (genérico)
 - Rótulo visível "Patrocinado(s) / Publicidade / Anúncio / Sponsored" junto da peça.
 - Sem rótulo = não é pago.

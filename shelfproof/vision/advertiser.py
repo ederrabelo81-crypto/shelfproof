@@ -71,19 +71,21 @@ Regras:
   Isso so alimenta a revisao humana de direitos de imagem; nao identifique quem e."""
 
 
-SYSTEM_FEATURED = """Voce audita banners da HOME de lojas brasileiras especialistas em \
-ar-condicionado (Frigelar, Dufrio, Leveros...). Estes banners sao da PROPRIA LOJA, nao sao midia \
-paga. O HTML nao diz qual marca o banner destaca. Sua tarefa e dizer qual MARCA de fabricante \
-(Midea, LG, Samsung, TCL, Daikin, Gree, Elgin...) o banner destaca.
+SYSTEM_FEATURED = """Voce audita pecas da HOME de lojas brasileiras (marketplaces como Amazon, \
+Mercado Livre, Magalu, Casas Bahia, Shopee, e o varejo especialista em ar-condicionado: Frigelar, \
+Dufrio, Leveros...): banners, pop-ups, laterais, faixas. Estas pecas sao da PROPRIA LOJA, nao sao \
+midia paga. O HTML nao diz qual marca a peca destaca. Sua tarefa e dizer qual MARCA de fabricante \
+(Midea, LG, Samsung, Motorola, Electrolux, TCL, Daikin, Apple...) a peca destaca.
 
 Regras:
 - So responda uma marca se ela estiver ESCRITA ou com o LOGOTIPO visivel na imagem. Leia; nao deduza.
 - Nao deduza a marca pelo formato do aparelho, pela cor, pela categoria ou pelo estilo.
 - advertiser e a MARCA do fabricante, nao o modelo ("WindFree" -> "Samsung"; "BreezeIN" -> "TCL";
   "Dual Inverter" sem logo nao basta).
-- O nome ou logo da propria loja (Frigelar, Dufrio, Leveros, Poloar, Clima Rio, CentralAr, Denteck,
-  ArCerto, Friopecas, WebContinental, Refricril) NAO e a marca em destaque.
-- Banner de campanha da loja (Black Friday, cupom, frete, parcelamento) sem marca de fabricante
+- O nome ou logo da propria loja (Amazon, Mercado Livre, Magalu, Casas Bahia, Shopee, Frigelar, Dufrio,
+  Leveros, Poloar, Clima Rio, CentralAr, Denteck, ArCerto, Friopecas, WebContinental, Refricril) NAO e a
+  marca em destaque, nem marca de cartao/banco/pagamento da loja (cartao Magalu, Mercado Pago).
+- Peca de campanha da loja (Black Friday, cupom, frete, parcelamento, app) sem marca de fabricante
   escrita ou com logo: brand_visible=false.
 - Varias marcas com o mesmo peso (ex.: "LG, Samsung e Midea com desconto"): brand_visible=false.
   So responda uma se ela assina ou domina a peca (logo principal, produto unico em destaque).
@@ -197,13 +199,20 @@ def _featured_context(p: Piece) -> str:
         parts.append(f"Alt no HTML: {p.alt[:140]}")
     if p.href:
         parts.append(f"Destino do clique: {p.href[:160]}")
-    parts.append("Qual marca de fabricante este banner da loja destaca?")
+    if p.extra.get("zone"):
+        parts.append(f"Onde aparece na pagina: {p.extra['zone']}")
+    parts.append("Qual marca de fabricante esta peca da loja destaca?")
     return "\n".join(parts)
 
 
 def is_featured_candidate(p: Piece, min_width: float = 300.0) -> bool:
-    """Banner de especialista sem marca em destaque, grande o bastante para ser vitrine."""
-    return (p.marketplace in SPECIALISTS and not p.is_paid and not p.extra.get("featured_brand")
+    """Banner da loja sem marca em destaque, grande o bastante para ser vitrine: banner de
+    especialista, ou peca que so a leitura da pagina viu (pop-up, meio da pagina, lateral...)."""
+    from_reading = p.extra.get("found_by") == "leitura_da_pagina"
+    vertical = p.bbox is not None and p.bbox.h >= 1.5 * p.bbox.w and p.bbox.w >= 100
+    if from_reading and vertical:
+        min_width = 100.0  # lateral/skyscraper e estreito por natureza
+    return ((p.marketplace in SPECIALISTS or from_reading) and not p.is_paid and not p.extra.get("featured_brand")
             and not p.extra.get("logo_strip") and not p.extra.get("brands_seen")
             and not (p.bbox is not None and p.bbox.w < min_width))
 
