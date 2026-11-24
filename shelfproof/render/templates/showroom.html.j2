@@ -187,7 +187,7 @@ details.method ul { padding-left: 18px; max-width: 80ch; }
   <span class="brand">Shelf<b>Proof</b></span>
   <span class="rec"><i></i>{{ header_line }}</span>
   <label class="daysel" id="daySelWrap" hidden><span>Dia</span><select id="daySel" aria-label="Escolher o dia da coleta"></select></label>
-  <nav aria-label="Seções"><a href="#wall">Video wall</a><a href="#board">Quem pagou</a><a href="#own">Propriedade</a><a href="#proof">Prova</a></nav>
+  <nav aria-label="Seções"><a href="#wall">Video wall</a><a href="#board">Quem pagou</a><a href="#featured" id="navFeatured" hidden>Marcas em destaque</a><a href="#own">Propriedade</a><a href="#proof">Prova</a></nav>
 </div></header>
 
 <main class="wrap">
@@ -210,9 +210,9 @@ details.method ul { padding-left: 18px; max-width: 80ch; }
   <section id="wall">
     <div class="sec-head">
       <div class="eyebrow">Video wall</div>
-      <h2>As seis vitrines, rodando como o cliente viu</h2>
+      <h2>As vitrines, rodando como o cliente viu</h2>
       <p>Cada tela repete em loop as peças salvas daquela home. A etiqueta mostra quem pagou e o código do espaço. Clique numa tela para abrir a galeria completa.</p>
-      <div class="legend"><span><i class="dot" style="background:var(--paid)"></i>Mídia paga</span><span><i class="dot" style="background:var(--own)"></i>Campanha do marketplace</span><span><i class="dot" style="background:#b48cff"></i>Loja da própria marca</span></div>
+      <div class="legend"><span><i class="dot" style="background:var(--paid)"></i>Mídia paga</span><span><i class="dot" style="background:var(--own)"></i><span id="ownLegend">Campanha do marketplace</span></span><span><i class="dot" style="background:#b48cff"></i>Loja da própria marca</span></div>
     </div>
     <div class="devsel" id="devSel" role="group" aria-label="Dispositivo" hidden></div>
     <div class="wall" id="wallGrid"></div>
@@ -225,6 +225,15 @@ details.method ul { padding-left: 18px; max-width: 80ch; }
       <p>Posições pagas com anunciante identificado, somando banners, vitrines patrocinadas e Sponsored Products. Logos recortados das próprias peças.</p>
     </div>
     <div class="board" id="boardList"></div>
+  </section>
+
+  <section id="featured" hidden>
+    <div class="sec-head">
+      <div class="eyebrow">Banners da própria loja</div>
+      <h2>Marcas em destaque nas vitrines</h2>
+      <p>Banners da própria varejista que levam a uma marca (pelo destino do clique, pelo texto ou pelo nome do arquivo da peça). Não é mídia vendida: nenhum rótulo de patrocínio na página. Faixas de logos e ícones pequenos ficam de fora.</p>
+    </div>
+    <div class="board" id="featList"></div>
   </section>
 
   <section id="own">
@@ -280,7 +289,8 @@ const DEV_NAME = { desktop: 'Desktop', mobile: 'Celular' };
 const airTxt = (r) => (r.of > 1 ? 'em ' + r.seen + ' de ' + r.of + ' rodadas' : '');
 const ALL = P.concat(X);
 const PAID = ALL.filter((r) => r.k === 'paid');
-const KIND = { paid: ['paid', 'PAGO'], own: ['own', 'MARKETPLACE'], brand: ['brand', 'LOJA DA MARCA'] };
+// own_label: "LOJA" quando so ha varejo especialista (a peca e da propria loja, nao de um marketplace)
+const KIND = { paid: ['paid', 'PAGO'], own: ['own', DATA.own_label || 'MARKETPLACE'], brand: ['brand', 'LOJA DA MARCA'] };
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -299,8 +309,15 @@ const byAdv = d3rollup(PAID.filter((r) => !isUnk(r.adv)));
 function d3rollup(rows) { const m = new Map(); rows.forEach((r) => { const o = m.get(r.adv) || { adv: r.adv, n: 0, where: new Map() }; o.n++; o.where.set(r.m, (o.where.get(r.m) || 0) + 1); m.set(r.adv, o); }); return [...m.values()].sort((a, b) => b.n - a.n || a.adv.localeCompare(b.adv)); }
 const kv = { 'k-pieces': P.length, 'k-paid': PAID.length, 'k-adv': byAdv.length };
 Object.entries(kv).forEach(([id, v]) => countUp($('#' + id), v));
-$('#k-lead').textContent = byAdv[0].adv;
-$('#k-lead-l').textContent = 'maior comprador de espaço (' + byAdv[0].n + ' posições)';
+// banner da varejista com marca em destaque (varejo especialista, 24/11/2026)
+const byFeat = (() => { const m = new Map(); P.filter((r) => r.k !== 'paid' && r.fb).forEach((r) => { const o = m.get(r.fb) || { adv: r.fb, n: 0, where: new Map() }; o.n++; o.where.set(r.m, (o.where.get(r.m) || 0) + 1); m.set(r.fb, o); }); return [...m.values()].sort((a, b) => b.n - a.n || a.adv.localeCompare(b.adv)); })();
+if (byAdv.length) {
+  $('#k-lead').textContent = byAdv[0].adv;
+  $('#k-lead-l').textContent = 'maior comprador de espaço (' + byAdv[0].n + ' posições)';
+} else if (byFeat.length) {
+  $('#k-lead').textContent = byFeat[0].adv;
+  $('#k-lead-l').textContent = 'marca mais destacada pelo varejo (' + byFeat[0].n + ' banners)';
+}
 function countUp(node, v) {
   if (reduce) { node.textContent = v; return; }
   const t0 = performance.now(), d = 1200;
@@ -333,6 +350,7 @@ Object.entries(MKTS).forEach(([key, mk]) => {
     const tag = el('div', 'tag'); const [cls, lbl] = KIND[r.k];
     tag.append(el('span', 'pill ' + cls, lbl));
     if (r.k === 'paid') tag.append(el('span', 'pill', r.adv));
+    else if (r.fb) tag.append(el('span', 'pill', 'destaque: ' + r.fb));
     tag.append(el('span', 'pill', r.slot));
     if (r.of > 1) tag.append(el('span', 'pill', r.seen + '/' + r.of + ' rodadas'));
     d.append(bg, im, tag); stage.append(d); return d;
@@ -388,7 +406,30 @@ function show(st, i) {
 }
 
 // leaderboard
-const max = byAdv[0].n;
+function boardRows(list, target, cls) {
+  const max = list.length ? list[0].n : 1;
+  list.forEach((o, idx) => {
+    const r = el('div', 'row' + (o.adv === 'Midea' ? ' me' : ''));
+    const lg = el('div', 'lg'); lg.append(logoChip(o.adv));
+    const box = el('div', 'barbox');
+    const b = el('div', 'barline'); b.style.width = (100 * o.n / max) + '%'; if (cls) b.style.background = cls;
+    const w = el('div', 'where');
+    [...o.where].sort((a, c) => c[1] - a[1]).forEach(([m, n]) => w.append(el('span', null, MKTS[m].name + ' × ' + n)));
+    box.append(b, w);
+    r.append(el('span', 'rk', String(idx + 1).padStart(2, '0')), lg, box, el('span', 'val', String(o.n)));
+    target.append(r);
+  });
+}
+if (!byAdv.length) {
+  const none = el('p', null, 'Nenhum espaço pago com marcador concreto (rótulo, código de slot ou parâmetro de anúncio) nesta coleta.');
+  none.style.cssText = 'color:var(--muted);font-size:14px;margin:0';
+  $('#boardList').append(none);
+}
+if (byFeat.length) {
+  boardRows(byFeat, $('#featList'), 'var(--own)');
+  $('#featured').hidden = false; $('#navFeatured').hidden = false;
+}
+const max = byAdv.length ? byAdv[0].n : 1;
 byAdv.forEach((o, idx) => {
   const r = el('div', 'row' + (o.adv === 'Midea' ? ' me' : ''));
   const lg = el('div', 'lg'); lg.append(logoChip(o.adv));
@@ -424,8 +465,14 @@ Object.entries(MKTS).forEach(([key, mk]) => DEVS.forEach((dev) => {
   $('#ownGrid').append(row);
 }));
 
+if (DATA.own_label) $('#ownLegend').textContent = 'Banner da própria loja';
 // proof of placement
 const proofAdvs = byAdv.map((o) => o.adv);
+if (!proofAdvs.length) {
+  const none = el('p', null, 'Sem espaço pago nesta coleta: não há prova de veiculação de anúncio a mostrar.');
+  none.style.cssText = 'color:var(--muted);font-size:14px;margin:0';
+  $('#proofCtl').append(none);
+}
 let cur = proofAdvs.includes('Midea') ? 'Midea' : proofAdvs[0];
 proofAdvs.forEach((a) => {
   const b = el('button', 'chipbtn'); b.type = 'button'; b.dataset.adv = a;

@@ -4,6 +4,7 @@
 shelf-proof/
 ├── CLAUDE.md                     # regras duras + objetivo
 ├── config/targets.json           # homes monitoradas (URL x dispositivos)
+├── config/targets_especialistas.json  # 11 especialistas de ar-condicionado (--out runs/especialistas)
 ├── shelfproof/
 │   ├── models.py                 # Piece, BBox (hierarquia Captura > Zona > Slot > Peça > Item)
 │   ├── cli.py / __main__.py      # capture | analyze | detect-file | showroom | contact-sheet | event
@@ -13,6 +14,7 @@ shelf-proof/
 │   ├── collect/capture.py        # robô: abre, observa carrossel, rola, salva print/HTML/imagens/elements
 │   ├── detect/
 │   │   ├── rules.py              # uma função por marketplace + genérico (rótulo Patrocinado/Anúncio)
+│   │   │                         #   + _specialist: varejo de ar-condicionado (marca em destaque, nunca pago)
 │   │   └── brands.py             # dicionário de marcas e aliases de slug (ssg_ = Samsung, elux = Electrolux)
 │   ├── vision/
 │   │   ├── advertiser.py         # fase 3: anunciante lido na imagem (Claude API), cache vision.json
@@ -26,6 +28,7 @@ shelf-proof/
 ├── reference/showroom_2026-11-11/      # ALVO VISUAL aprovado + data.json + placements_v1.csv
 ├── tests/
 │   ├── fixtures/homes_2026-11-11/      # 6 homes salvas em 11/11 (gzip) — regressão do detector
+│   ├── fixtures/homes_2026-11-24/      # 11 homes de especialistas renderizadas (gzip, sem scripts)
 │   ├── fixtures/mock_magalu/           # home falsa para o e2e do robô
 │   ├── test_rules_11_11.py
 │   ├── test_capture_e2e.py

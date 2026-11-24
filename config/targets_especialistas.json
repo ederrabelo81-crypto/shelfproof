@@ -1,0 +1,16 @@
+{
+  "_comment": "Varejo especialista em ar-condicionado (Black Friday 2026). Sessao anonima limpa: as 11 homes abriram sem antibot em 24/11/2026. Rodar com --out runs/especialistas para o Showroom nao somar com o dos marketplaces no mesmo dia (scripts\\coleta_especialistas.bat).",
+  "targets": [
+    {"name": "Friopecas",      "url": "https://www.friopecas.com.br/",      "devices": ["desktop", "mobile"]},
+    {"name": "Frigelar",       "url": "https://www.frigelar.com.br/",       "devices": ["desktop", "mobile"]},
+    {"name": "WebContinental", "url": "https://www.webcontinental.com.br/", "devices": ["desktop", "mobile"]},
+    {"name": "Dufrio",         "url": "https://www.dufrio.com.br/",         "devices": ["desktop", "mobile"]},
+    {"name": "Poloar",         "url": "https://www.poloar.com.br/",         "devices": ["desktop", "mobile"]},
+    {"name": "Clima Rio",      "url": "https://www.climario.com.br/",       "devices": ["desktop", "mobile"]},
+    {"name": "CentralAr",      "url": "https://www.centralar.com.br/",      "devices": ["desktop", "mobile"]},
+    {"name": "Denteck",        "url": "https://www.denteck.com.br/",        "devices": ["desktop", "mobile"]},
+    {"name": "ArCerto",        "url": "https://www.arcerto.com/",           "devices": ["desktop", "mobile"]},
+    {"name": "Leveros",        "url": "https://www.leveros.com.br/",        "devices": ["desktop", "mobile"]},
+    {"name": "Refricril",      "url": "https://www.refricril.com.br/",      "devices": ["desktop", "mobile"]}
+  ]
+}

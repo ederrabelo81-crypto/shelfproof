@@ -611,7 +611,8 @@ def _warm_up(page: Any, url: str, device: str = "desktop", force: bool = False) 
 OVERLAY_BUTTONS = [
     re.compile(r"^\s*portugu[eê]s\s*\(br\)\s*$", re.I),            # Shopee: "Selecione seu idioma"
     re.compile(r"^\s*aceitar( todos)?( os)?( cookies)?\s*$", re.I),  # aviso de cookies
-    re.compile(r"^\s*(aceito|concordo|entendi|ok,? entendi)\s*$", re.I),
+    # Frigelar "Concordar", ArCerto "OK, ENTENDI." (aviso de cookies dos especialistas, 24/11/2026)
+    re.compile(r"^\s*(aceito|concordo|concordar|entendi|ok,? entendi)\.?\s*$", re.I),
     # pesquisa de satisfacao (Magalu celular 17/11/2026: QuestionPro "Queremos o seu feedback",
     # dentro de um iframe). Recusar a pesquisa e o que o cliente faz para ver a vitrine.
     re.compile(r"^\s*(agora n[aã]o|n[aã]o,? obrigad[oa])\s*$", re.I),

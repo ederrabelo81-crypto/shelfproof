@@ -81,6 +81,42 @@ ajuste a regra com teste.
 - Tudo é `brand_store`. A zona vem de `utmi_pc` (`banner_tv`, `banner_menu`,
   `vitrine_categorias`, `mosaico_*`, `oferta_relampago`) e a campanha de `utmi_cp`.
 
+## Varejo especialista em ar-condicionado (24/11/2026)
+Friopeças, Frigelar, WebContinental, Dufrio, Poloar, Clima Rio, CentralAr, Denteck, ArCerto, Leveros,
+Refricril (`config/targets_especialistas.json`, regra `_specialist` em `rules.py`). Levantado nas 11
+homes renderizadas (desktop, anônimo); fixtures em `tests/fixtures/homes_2026-11-24/`.
+- **Mídia paga:** nenhuma das 11 marca espaço vendido na home (zero "Patrocinado", zero parâmetro de
+  anúncio). Só o rótulo genérico tornaria uma peça `paid`. Banner de marca = banner **da loja**
+  (`marketplace`) com `extra.featured_brand`, nunca pago (regra dura 1).
+- **Marca em destaque**, por ordem de força: destino do clique (`/marcas/midea`, `?Marca=TCL`,
+  `/midea?map=b`, `?q=philco`, `/selecao-lg`), texto alternativo ("Ar-Cond. MIDEA - ..."), nome do
+  arquivo (`Midea_BlackFriday_Desktop.jpg`, `home-v9-m01-bf-v2-cassete-samsung`). Duas marcas na mesma
+  fonte = sem destaque (`extra.brands_seen`).
+- **Banner** = imagem dentro de ancestral `banner|slider|slide|carousel|swiper|hero|slick|keen|infocard|mosaic`,
+  ou em pasta `/banner(s)/`, ou alt "Banner ...". Fora: card de produto (`product-card`, `/arquivos/ids/`,
+  `/upload/produto/`, link `/p`), blog, redes sociais, WhatsApp, rodapé, ícone < 120 px, logo da loja.
+- **Faixa de logos** (navegação por marca: `home-brands-slider`, `BrandModule`, `brandSlide`,
+  `b2c-home-slider-brands`): `extra.logo_strip`, fora do ranking. Logo pequeno (< 300 px) também fica fora.
+- **Por site:**
+  - Frigelar: carrossel principal (`carousel-banner`) **sem link**; a marca vem do alt. Mosaico com Elgin/Gree.
+    Imagens por `/img?source=...`: o clone é a mesma imagem, não o mesmo link.
+  - Dufrio: `main-banner` + `home-brands-slider` (logos). Alt "Banner TCL Trade" → `extra.trade_hint`
+    (indício de verba de trade, **não** marcador de mídia vendida). `?marca=385` é id, sem marca.
+  - Leveros: `<picture>` com `<source>` desktop e `<img src>` de celular → `extra.src_candidates`.
+    `/c/cupomtcl100` não separa a marca (sem destaque).
+  - Poloar (Next.js): toda imagem é `/_next/image?url=<arquivo>&w=`; o arquivo do parâmetro `url` identifica a peça.
+    O DOM do desktop traz também o slide de celular (`heroslider_mobileImage`, display:none).
+  - CentralAr: home "v9" sem classe de banner; hero `ca-v9-m01` (Elgin, Samsung, Electrolux, TCL) sem link,
+    marca no alt e no arquivo. Logos em `ca-v9-m04`.
+  - Clima Rio: hero VTEX com `/<marca>?map=b`; "AUFIT" é marca exclusiva da loja.
+  - WebContinental: carrossel e lista de banners quase só LG (`/selecao-lg`, `/lg-dual-inverter`).
+  - Denteck (Nuvemshop): banners "Banner N" com `/search/?q=<marca>`; versões 1920 e 1024 no DOM.
+- **Pipeline:** banner de especialista só casa com `elements.json` pela **imagem** (vários banners
+  levam ao mesmo link) e, sem caixa na página renderizada, sai (variante do outro dispositivo).
+- **`summary.json`:** `featured_by_brand`, `featured_area_by_brand`, `featured_first_fold`.
+- **Cookies:** "Concordar" (Frigelar), "OK, ENTENDI." (ArCerto), "Aceitar" (Poloar, CentralAr) —
+  `capture.OVERLAY_BUTTONS`.
+
 ## Qualquer outro site (genérico)
 - Rótulo visível "Patrocinado(s) / Publicidade / Anúncio / Sponsored" junto da peça.
 - Sem rótulo = não é pago.

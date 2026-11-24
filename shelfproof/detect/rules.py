@@ -9,6 +9,9 @@ jeito. Regras levantadas nas homes de 11/11/2026 (docs/MAPA_SLOTS.md):
 * Mercado Livre peca de display (click1.../display/clicks) com "_ADS_" no codigo do alt
 * Shopee      adsTrackingPayload no link; banners de "Lojas Oficiais" no carrossel
 * Loja da marca (dominio da propria marca) tudo e brand_store
+* Especialistas de ar-condicionado (Frigelar, Dufrio, Leveros...: SPECIALISTS) -- banners da
+  propria varejista; a marca em destaque vem do destino/alt/arquivo (extra.featured_brand).
+  Pago so com rotulo visivel (generico), como em qualquer site.
 
 REGRA DURA (herdada do RAC, COMMON_MISTAKES #15 e #20): evidencia antes de
 string, e ausencia de dado e dado ausente. Toda peca "paid" carrega em
@@ -23,7 +26,7 @@ from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from shelfproof.detect.brands import INGREDIENTS, find_brand, find_brand_first
+from shelfproof.detect.brands import INGREDIENTS, find_brand, find_brand_first, find_brands, strip_ingredients
 from shelfproof.models import UNKNOWN_ADVERTISER, Piece
 
 SPONSOR_LABEL_RE = re.compile(r"^\s*(patrocinad[oa]s?|publicidade|an[uú]ncio|sponsored)\s*$", re.I)
@@ -36,6 +39,26 @@ MARKETPLACE_HOSTS: Dict[str, str] = {
     "shopee.com.br": "shopee",
     "midea.com.br": "midea",
 }
+
+# Varejo especialista em ar-condicionado (Black Friday 2026). Nenhum deles marca espaco vendido a
+# marca na home (24/11/2026: zero "Patrocinado", zero parametro de anuncio): banner de marca e
+# banner da propria varejista com a marca em destaque, nao midia paga (regra dura 1).
+# chave -> (host, nome, contexto extra de banner alem de _BANNER_CTX)
+SPECIALISTS: Dict[str, "tuple[str, str, str]"] = {
+    "friopecas": ("friopecas.com.br", "Friopeças", ""),
+    "frigelar": ("frigelar.com.br", "Frigelar", ""),
+    "webcontinental": ("webcontinental.com.br", "WebContinental", ""),
+    "dufrio": ("dufrio.com.br", "Dufrio", ""),
+    "poloar": ("poloar.com.br", "Poloar", ""),
+    "climario": ("climario.com.br", "Clima Rio", ""),
+    # home "v9" da CentralAr: hero (m01) e blocos de foto sem classe de banner
+    "centralar": ("centralar.com.br", "CentralAr", r"ca-v9-m01|ca-v9-m09|ca-v9-m11"),
+    "denteck": ("denteck.com.br", "Denteck", ""),
+    "arcerto": ("arcerto.com", "ArCerto", ""),
+    "leveros": ("leveros.com.br", "Leveros", ""),
+    "refricril": ("refricril.com.br", "Refricril", ""),
+}
+MARKETPLACE_HOSTS.update({host: key for key, (host, _n, _c) in SPECIALISTS.items()})
 MARKETPLACE_NAMES: Dict[str, str] = {
     "amazon": "Amazon",
     "mercadolivre": "Mercado Livre",
@@ -44,6 +67,7 @@ MARKETPLACE_NAMES: Dict[str, str] = {
     "shopee": "Shopee",
     "midea": "Loja Midea",
     "generic": "Site",
+    **{key: name for key, (_h, name, _c) in SPECIALISTS.items()},
 }
 # Lojas da propria marca: tudo que aparece la e da marca (brand_store).
 BRAND_STORES: Dict[str, str] = {"midea": "Midea"}
@@ -63,6 +87,9 @@ def identify_marketplace(html: str, url: str = "") -> str:
         if host.endswith(h):
             return key
     head = html[:20000].lower()
+    for key, (h, _n, _c) in SPECIALISTS.items():  # antes de "midea": a home do especialista cita marcas
+        if h in head:
+            return key
     for key, needle in [("amazon", "amazon.com.br"), ("mercadolivre", "mercado livre"),
                         ("magalu", "magalu"), ("casasbahia", "casas bahia"),
                         ("shopee", "shopee"), ("midea", "midea")]:
@@ -426,6 +453,146 @@ def _brand_store(key: str) -> Callable[[BeautifulSoup], List[Piece]]:
 
 
 # ---------------------------------------------------------------------------
+# Varejo especialista em ar-condicionado
+# ---------------------------------------------------------------------------
+# Ancestral que diz "isto e banner/carrossel" (levantado nas 11 homes renderizadas em 24/11/2026)
+_BANNER_CTX = re.compile(r"banner|slider|slide|carousel|swiper|hero|slick|keen|infocard|mosaic|brandmodule", re.I)
+_LOGO_STRIP_CTX = re.compile(r"brands?[-_]?slid(?:e|er)|slider[-_]brands|brandmodule|^marcas$|ca-v9-m04", re.I)
+_LOGO_STRIP_SRC = re.compile(r"slider-brands|brands-slider|home-brands|/logos?-?marcas?/", re.I)
+# card de produto dentro de carrossel (Leveros: product-card; CentralAr: pdc_product-item; VTEX: product-summary)
+_PRODUCT_CTX = re.compile(r"product|produto|shelf", re.I)
+_PRODUCT_HREF = re.compile(r"/p/?(?:$|\?)|/p/[\w-]+|/produtos?/|/dp/|\.html(?:$|\?)", re.I)
+_PRODUCT_SRC = re.compile(r"/arquivos/ids/|/produtos/foto/|/products/|/upload/produto/|/medias/[^/]*product", re.I)
+_CHROME_HREF = re.compile(r"^(?:tel:|mailto:|javascript:)|whatsapp|wa\.me|instagram|facebook|youtube|tiktok|linkedin|"
+                          r"reclameaqui|lojaconfiavel|play\.google|apps\.apple|vtex\.com|/login|/minha-conta|/blog/", re.I)
+_SEP = re.compile(r"[-_/?=&.+%,;:]+")
+
+
+def _ctx_tokens(img: Tag, depth: int = 10) -> List[str]:
+    out: List[str] = []
+    for i, anc in enumerate(img.parents):
+        if i >= depth or anc.name in ("body", "html", "[document]"):
+            break
+        out += [c for c in (anc.get("class") or []) if isinstance(c, str)]
+    return out
+
+
+def _slot_name(tokens: List[str], pattern: "re.Pattern[str]") -> str:
+    for t in tokens:
+        if pattern.search(t):
+            t = t.split("--")[-1] if "--" in t else t
+            t = re.sub(r"^[\w-]*?-\d+-x-", "", t)  # VTEX IO: "vtex-slider-layout-0-x-imageElementLink"
+            return re.sub(r"__[A-Za-z0-9-]{5}$", "", t)[:60]
+    return ""
+
+
+def _slug_text(u: str) -> str:
+    """Destino ou nome de arquivo como texto: '/marcas/Springer-Midea/c/X' -> 'marcas Springer Midea c X'."""
+    return _SEP.sub(" ", unquote(u or "")).strip()
+
+
+def _specialist_brand(href: str, alt: str, src: str) -> "tuple[str, str, List[str]]":
+    """Marca em destaque no banner, pela ordem de forca da evidencia: destino do clique, texto
+    alternativo, nome do arquivo da peca. Mais de uma marca na mesma fonte = sem destaque unico."""
+    p = urlparse(href or "")
+    fname = urlparse(unquote(src or "")).path.rsplit("/", 1)[-1]
+    if "/_next/image" in (src or ""):  # Next.js (Poloar): o arquivo real vem no parametro url
+        inner = (parse_qs(urlparse(src).query).get("url") or [""])[0]
+        fname = urlparse(inner).path.rsplit("/", 1)[-1] or fname
+    fname = re.sub(r"___[0-9a-f]{32}", "", fname)  # VTEX file-manager: <uuid>___<hash>
+    for source, text in (("destino", _slug_text(p.path + " " + p.query)), ("alt", alt), ("arquivo", _slug_text(fname))):
+        found = find_brands([strip_ingredients(text)]) if text else []
+        found = [b for b in found if not (b == "Midea" and "Springer Midea" in found)]
+        if len(found) == 1:
+            return found[0], source, found
+        if len(found) > 1:
+            return "", source, found
+    return "", "", []
+
+
+def _specialist(key: str) -> Callable[[BeautifulSoup], List[Piece]]:
+    host, name, extra_ctx = SPECIALISTS[key]
+    ctx_re = re.compile(_BANNER_CTX.pattern + (f"|{extra_ctx}" if extra_ctx else ""), re.I)
+
+    def run(soup: BeautifulSoup) -> List[Piece]:
+        out: List[Piece] = []
+        for img in soup.find_all("img"):
+            if img.find_parent("footer"):
+                continue
+            src = img_src(img)
+            if not src or src.startswith("data:") or re.search(r"\.svg(?:$|\?)", src, re.I):
+                continue
+            if re.search(r"no-image|placeholder|blank\.(?:gif|png)|loading\.gif", src, re.I):
+                continue  # lazy-load ainda sem a peca (Frigelar: /img/no-image.jpg)
+            href = parent_href(img).strip()
+            alt = _clean(img.get("alt"), 200)
+            if _PRODUCT_HREF.search(href) or _PRODUCT_SRC.search(unquote(src)) or _CHROME_HREF.search(href):
+                continue
+            dest = urlparse(href)
+            if href == "/" or (dest.path in ("", "/") and dest.netloc.endswith(host)):
+                continue  # logo da loja
+            w = re.search(r"[?&](?:width|w)=(\d+)", src)
+            attr_w = str(img.get("width") or "")
+            if (w and int(w.group(1)) < 120) or (attr_w.isdigit() and int(attr_w) < 120):
+                continue  # icone
+            tokens = _ctx_tokens(img)
+            if any(_PRODUCT_CTX.search(t) for t in tokens):
+                continue
+            slot = _slot_name(tokens, ctx_re)
+            if not slot and not re.search(r"/banners?/", src, re.I) and not re.match(r"banner\b", alt, re.I):
+                continue  # nao esta em banner/carrossel: vitrine de produto, icone, cabecalho
+            # faixa de logos (navegacao por marca), pela classe ou pela pasta do arquivo (Leveros:
+            # /upload/menu/b2c-home-slider-brands/): logo pequeno nao e banner de destaque
+            logo_strip = bool(_slot_name(tokens, _LOGO_STRIP_CTX)) or bool(_LOGO_STRIP_SRC.search(src))
+            brand, source, seen = _specialist_brand(href, alt, src)
+            evidence = ["banner da propria varejista: nenhum rotulo de patrocinio nem parametro de anuncio"]
+            extra: Dict[str, str] = {"featured_brand": brand, "needs_box": "1"}
+            if brand:
+                where = {"destino": f"destino do clique '{href}'", "alt": f"texto alternativo '{alt}'",
+                         "arquivo": "nome do arquivo da peca"}[source]
+                evidence.append(f"marca em destaque: {brand} ({where})")
+                extra["featured_brand_source"] = source
+            elif len(seen) > 1:
+                extra["brands_seen"] = ", ".join(seen)
+            if logo_strip:
+                extra["logo_strip"] = "1"
+            pic = img.find_parent("picture")  # o lxml aninha <img> dentro de <source>: o ancestral resolve
+            if pic is not None:
+                # <picture> (Leveros 24/11/2026): o <img src> e a versao de celular e o navegador mostra a do
+                # <source> de desktop. O pipeline casa a peca com qualquer uma das fontes.
+                cands = [(so.get("srcset") or so.get("data-srcset") or "").split(",")[0].strip().split(" ")[0]
+                         for so in pic.find_all("source")]
+                cands = [c for c in cands if c and not c.startswith("data:")]
+                if cands:
+                    extra["src_candidates"] = " ".join(cands)
+            if re.search(r"\btrade\b", alt, re.I):
+                # Dufrio 24/11/2026: alt "Banner TCL Trade". Indicio de verba de trade, nao marcador
+                # de midia vendida: fica marketplace, para o analista conferir com a marca.
+                extra["trade_hint"] = f"alt cita 'Trade': '{alt}'"
+            out.append(Piece(key, "marketplace", "banner", name, "faixa de marcas" if logo_strip else (slot or "banner"),
+                             None, title=alt or (f"banner {brand}" if brand else "banner sem texto"), alt=alt, href=href, img_src=src,
+                             evidence=evidence, extra=extra))
+        return out
+
+    return run
+
+
+def _dedupe_specialist(pieces: List[Piece]) -> List[Piece]:
+    """Varias pecas levam ao MESMO destino (Poloar: 6 banners para /ar-condicionado?...): aqui o
+    clone do carrossel e a mesma imagem no mesmo slot, nao o mesmo link."""
+    seen, out = set(), []
+    for p in pieces:
+        if not p.is_paid:
+            # mesma imagem em outro tamanho = clone; /_next/image?url=<arquivo> (Poloar) e outra peca por url
+            key = (p.slot, re.sub(r"[?&](?:w|width|h|height|q|quality|format|aspect|v)=[^&]*", "", p.img_src))
+            if key in seen:
+                continue
+            seen.add(key)
+        out.append(p)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Generico: qualquer site
 # ---------------------------------------------------------------------------
 def _generic(soup: BeautifulSoup) -> List[Piece]:
@@ -455,6 +622,7 @@ RULES: Dict[str, Callable[[BeautifulSoup], List[Piece]]] = {
     "shopee": _shopee,
     "midea": _brand_store("midea"),
     "generic": _generic,
+    **{key: _specialist(key) for key in SPECIALISTS},
 }
 
 
@@ -473,4 +641,12 @@ def detect(html: str, url: str = "", marketplace: Optional[str] = None) -> List[
         pieces += [p for p in _generic(soup)]
         for p in pieces:
             p.marketplace = key
+    if key in SPECIALISTS:
+        base = url or f"https://www.{SPECIALISTS[key][0]}/"
+        for p in pieces:  # link/imagem relativos: absolutos, como o navegador grava em elements.json
+            p.href = urljoin(base, p.href) if p.href else ""
+            p.img_src = urljoin(base, p.img_src) if p.img_src else ""
+            if p.extra.get("src_candidates"):
+                p.extra["src_candidates"] = " ".join(urljoin(base, c) for c in p.extra["src_candidates"].split())
+        return _dedupe_specialist(pieces)
     return _dedupe(pieces)

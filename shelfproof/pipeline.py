@@ -13,7 +13,7 @@ import hashlib
 import json
 import re
 from collections import defaultdict
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -33,6 +33,12 @@ def _src_key(u: str) -> str:
     if not u:
         return ""
     p = urlparse(u)
+    if p.path.endswith("/_next/image"):
+        # Next.js (Poloar 24/11/2026): toda imagem e /_next/image?url=<arquivo>&w=<largura>;
+        # o navegador escolhe outra largura do srcset. A peca e o arquivo do parametro url.
+        inner = (parse_qs(p.query).get("url") or [""])[0]
+        if inner:
+            return _src_key(urljoin(f"{p.scheme}://{p.netloc}/", inner))
     # Amazon: /images/I/<id>.<modificadores>.jpg -- o navegador pede outra qualidade/formato
     # (_FMavif_..._QL54_) do mesmo <id> que o HTML traz (_QL80_). 12/11/2026: 19 pecas sem imagem.
     m = re.match(r"(/images/I/[^./]+)\.", p.path)
@@ -89,7 +95,16 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
     used_by_path: set = set()
 
     for p in pieces:
-        el: Optional[Dict[str, Any]] = by_src.get(_norm(p.img_src)) or by_href.get(_norm(p.href))
+        if p.extra.get("needs_box"):
+            # banner de especialista: so pela imagem. Varios banners levam ao mesmo link (Poloar) e a
+            # versao de celular da peca fica no DOM do desktop (display:none): pelo link, viraria duplicata.
+            el = None
+            for cand in [p.img_src] + p.extra.get("src_candidates", "").split():
+                el = by_src.get(_norm(cand)) or by_srckey.get(_src_key(cand))
+                if el:
+                    break
+        else:
+            el = by_src.get(_norm(p.img_src)) or by_href.get(_norm(p.href))
         if el is None and p.img_src:
             el = by_srckey.get(_src_key(p.img_src))
         if el is None and not p.img_src and p.href:
@@ -109,6 +124,14 @@ def analyze(run_dir: Path, reader: Optional[Any] = None) -> List[Piece]:
             p.extra["image_file"] = images[_norm(p.img_src)]
         if "image_file" not in p.extra and p.img_src and _src_key(p.img_src) in img_by_srckey:
             p.extra["image_file"] = img_by_srckey[_src_key(p.img_src)]
+
+    if elements:
+        # banner de especialista sem caixa na pagina renderizada = variante do outro dispositivo
+        # (display:none) ou slide que nao existe nesta tela: nao foi visto, nao entra
+        pieces = [p for p in pieces if not (p.extra.get("needs_box") and p.bbox is None)]
+    for p in pieces:
+        p.extra.pop("needs_box", None)
+        p.extra.pop("src_candidates", None)
 
     # espaco pago sem imagem com caixa conhecida (Amazon adplacements em iframe): recorta do print
     _crop_slots(pieces, run_dir, manifest, _load_json(run_dir / "slots.json", []), vh)
@@ -214,6 +237,18 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         if p.is_paid:
             paid_by_adv[p.advertiser] += 1
             area_by_adv[p.advertiser] += a
+    featured: Dict[str, int] = defaultdict(int)
+    featured_area: Dict[str, float] = defaultdict(float)
+    featured_fold: Dict[str, int] = defaultdict(int)
+    for p in pieces:
+        fb = p.extra.get("featured_brand")
+        # faixa de logos (navegacao por marca) e icone pequeno nao contam como destaque
+        if p.is_paid or not fb or p.extra.get("logo_strip") or (p.bbox and p.bbox.w < 300):
+            continue
+        featured[fb] += 1
+        featured_area[fb] += p.bbox.area if p.bbox else 0.0
+        if p.bbox and p.bbox.fold == 1:
+            featured_fold[fb] += 1
     total_area = sum(area_owner.values()) or 1.0
     return {
         "pieces": len(pieces),
@@ -225,4 +260,8 @@ def summarize(pieces: List[Piece]) -> Dict[str, Any]:
         "paid_identified_by_vision": sum(1 for p in pieces if p.is_paid and p.extra.get("advertiser_source") == "vision"),
         "paid_needs_review": [p.advertiser for p in pieces if p.is_paid and p.extra.get("needs_review")],
         "first_fold_paid": sum(1 for p in pieces if p.is_paid and p.bbox and p.bbox.fold == 1),
+        # varejo especialista: banner da varejista com marca em destaque (nao e midia paga)
+        "featured_by_brand": dict(sorted(featured.items(), key=lambda kv: -kv[1])),
+        "featured_area_by_brand": {k: round(v) for k, v in sorted(featured_area.items(), key=lambda kv: -kv[1])},
+        "featured_first_fold": dict(sorted(featured_fold.items(), key=lambda kv: -kv[1])),
     }

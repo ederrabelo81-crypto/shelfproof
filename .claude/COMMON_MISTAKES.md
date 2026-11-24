@@ -202,3 +202,19 @@ e 6 de 8 pagas "Nao identificado" ficaram sem imagem (sem Showroom, sem leitura 
 captura grava a caixa de cada espaço (`slots.json`) e o pipeline recorta o criativo do `full.jpg`
 (`extra.image_source = "recorte do print da pagina"`); caixa em branco não vira criativo. Também:
 link `/ap/signin` nunca é destino de anúncio (o card "Patrocinado" pegava o login do bloco ao lado).
+
+### S22. Banner de marca no varejo especialista lido como mídia paga (24/11/2026)
+**Tentação:** a home da Frigelar/Dufrio/Leveros na Black Friday é quase toda de marca (Midea, TCL, LG,
+Daikin...), e o alt da Dufrio diz "Banner TCL Trade". Parece espaço comprado. **Por quê não:** nenhuma das
+11 homes traz rótulo de patrocínio nem parâmetro de anúncio; verba de trade é acordo fora da página.
+**Certo:** `marketplace` (banner da loja) com `extra.featured_brand` e a fonte da marca na evidência; o
+"Trade" vira `extra.trade_hint` para conferir com a marca. Ranking próprio no Showroom ("Marcas em
+destaque"), separado de "Quem pagou".
+
+### S23. Deduplicar banner pelo link ou pelo caminho da imagem (24/11/2026)
+**Errado:** tratar como clone de carrossel o banner com o mesmo destino (Poloar: 6 banners diferentes para
+`/ar-condicionado?...`) ou com o mesmo caminho sem query (Poloar `/_next/image?url=...`, Frigelar
+`/img?source=...`): a Frigelar perdia o mosaico da Gree e a Poloar ficava com metade das peças.
+**Certo:** clone = mesmo slot + mesma imagem, ignorando só os parâmetros de tamanho (`_dedupe_specialist`);
+no pipeline, `_src_key` lê o arquivo do parâmetro `url` do Next.js.
+

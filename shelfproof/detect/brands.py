@@ -69,6 +69,17 @@ BRANDS: List[Tuple[str, List[str]]] = [
     ("Toshiba", [r"toshiba"]),
     ("Panasonic", [r"panasonic"]),
     ("Haier", [r"haier"]),
+    # varejo especialista em ar-condicionado (homes de 24/11/2026: Dufrio, Leveros, CentralAr, Clima Rio)
+    ("Carrier", [r"carrier"]),
+    ("Hitachi", [r"hitachi"]),
+    ("Ventisol", [r"ventisol"]),
+    ("Komeco", [r"komeco"]),
+    ("Rinnai", [r"rinnai"]),
+    ("Trane", [r"\btrane\b"]),
+    ("Aufit", [r"\baufit\b"]),  # marca exclusiva da Clima Rio
+    ("Fricon", [r"fricon"]),
+    ("Gelopar", [r"gelopar"]),
+    ("Imbera", [r"imbera"]),
 ]
 
 _COMPILED = [(name, [re.compile(p, re.I) for p in pats]) for name, pats in BRANDS]

@@ -29,14 +29,29 @@ MKT_STYLE: Dict[str, Dict[str, str]] = {
     "shopee": {"key": "shopee", "name": "Shopee", "color": "#ee4d2d"},
     "midea": {"key": "midea", "name": "Loja Midea", "color": "#27a3e3"},
     "generic": {"key": "site", "name": "Site", "color": "#9aa4b8"},
+    # varejo especialista em ar-condicionado (24/11/2026)
+    "friopecas": {"key": "friopecas", "name": "Friopeças", "color": "#e30613"},
+    "frigelar": {"key": "frigelar", "name": "Frigelar", "color": "#1b75bb"},
+    "webcontinental": {"key": "webcont", "name": "WebContinental", "color": "#f7a600"},
+    "dufrio": {"key": "dufrio", "name": "Dufrio", "color": "#00a0e3"},
+    "poloar": {"key": "poloar", "name": "Poloar", "color": "#d9d9d9"},
+    "climario": {"key": "climario", "name": "Clima Rio", "color": "#0bb3a0"},
+    "centralar": {"key": "centralar", "name": "CentralAr", "color": "#2f6df6"},
+    "denteck": {"key": "denteck", "name": "Denteck", "color": "#ff6a13"},
+    "arcerto": {"key": "arcerto", "name": "ArCerto", "color": "#4cc3ff"},
+    "leveros": {"key": "leveros", "name": "Leveros", "color": "#7ac143"},
+    "refricril": {"key": "refricril", "name": "Refricril", "color": "#c8102e"},
 }
+SPECIALIST_KEYS = {"friopecas", "frigelar", "webcontinental", "dufrio", "poloar", "climario", "centralar",
+                   "denteck", "arcerto", "leveros", "refricril"}
 KIND = {"paid": "paid", "marketplace": "own", "brand_store": "brand", "organic": "own"}
 LOGO_DIR_DEFAULT = Path(__file__).resolve().parents[2] / "assets" / "logos"
 DARK_LOGOS_DEFAULT = {"samsung", "intel", "acer", "apple", "neutrogena"}
 
 
 def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[str], excluded: int = 0,
-                 n_rounds: int = 1, window: str = "", viewport_only: Optional[List[str]] = None) -> List[str]:
+                 n_rounds: int = 1, window: str = "", viewport_only: Optional[List[str]] = None,
+                 featured: bool = False) -> List[str]:
     """Como a leitura foi feita, dito com as condicoes REAIS de cada coleta (manifest.session)."""
     clean = [s for s, v in sessions.items() if v == "anon"]
     warm = [s for s, v in sessions.items() if v == "anon_warm"]
@@ -53,8 +68,12 @@ def method_notes(date_label: str, sessions: Dict[str, str], empty_sites: List[st
         notes.append(f"Celular em {', '.join(viewport_only)}: tela e toque de celular, com o navegador se "
                      "apresentando como desktop (com a identificação de Android as vitrines não carregavam). "
                      "O layout é o do celular, mas os espaços pagos são os que o site vende para desktop (slots desk_...).")
-        notes.append("Mídia paga só com marcador concreto na página (rótulo, código de slot ou parâmetro de anúncio); "
+    notes.append("Mídia paga só com marcador concreto na página (rótulo, código de slot ou parâmetro de anúncio); "
                  "anunciante sem nome na página fica \"Não identificado\" ou é lido na própria peça.")
+    if featured:
+        notes.append("Banner da própria loja com marca em destaque: a marca vem do destino do clique (página da marca, "
+                     "busca ou filtro pela marca), do texto alternativo ou do nome do arquivo da peça. Não é contado como "
+                     "mídia paga: a página não traz rótulo de patrocínio. Acordo comercial (verba de trade) só a marca e a loja confirmam.")
     notes.append("Espaços pagos sem imagem salva entram no ranking e aparecem na prova como registro de código.")
     if empty_sites:
         notes.append(f"Sem peça com imagem nesta coleta: {', '.join(empty_sites)}.")
@@ -191,6 +210,9 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
                    "title": p.get("title") or p.get("alt") or "",
                    "seen": len(a["seen"]), "of": len(runs),
                    "t0": _hhmm(min(a["seen"])), "t1": _hhmm(max(a["seen"]))}
+            fb = (p.get("extra") or {}).get("featured_brand")
+            if fb and p["ownership"] != "paid" and not (p.get("extra") or {}).get("logo_strip"):
+                row["fb"] = fb  # banner da loja com marca em destaque (nao e midia paga)
             if a["frames"]:
                 row["air"] = f"{a['hits']}/{a['frames']}"
             if img_file and n < max_per_site:
@@ -216,7 +238,7 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
             if p["ownership"] == "paid":
                 extras.append({k: v for k, v in row.items() if k not in ("k", "pos")})
 
-    advs = {p["adv"] for p in pieces} | {x["adv"] for x in extras}
+    advs = {p["adv"] for p in pieces} | {x["adv"] for x in extras} | {p["fb"] for p in pieces if p.get("fb")}
     logos: Dict[str, str] = {}
     for adv in sorted(advs):
         slug = adv.lower().replace("â", "a").replace("ó", "o").replace("+", "").replace(" ", "")
@@ -229,6 +251,9 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
     window = f"{_hhmm(times[0])}–{_hhmm(times[-1])}" if times else ""
     data = dict(date=date_label, mkts=mkts, logos=logos, dark_logos=sorted(DARK_LOGOS_DEFAULT & set(logos.values())),
                 pieces=pieces, extras=extras, devices=devices, rounds=rounds_by, window=window)
+    mkt_keys = {r["manifest"].get("marketplace", "generic") for rs in groups.values() for r in rs}
+    if mkt_keys and mkt_keys <= SPECIALIST_KEYS:
+        data["own_label"] = "LOJA"  # so varejo especialista: a peca e da propria loja
     header = f"COLETA {date_label} · {' + '.join(d.upper() for d in devices)} · {len(mkts)} PAGINAS"
     if n_rounds > 1:
         header += f" · {n_rounds} RODADAS {window}"
@@ -239,7 +264,8 @@ def build_from_runs(run_dirs: Iterable[Path], out_dir: Path, event_label: str, d
         sites_text=", ".join(sites[:-1]) + (" e " + sites[-1] if len(sites) > 1 else (sites[0] if sites else "")),
         method_notes=method_notes(date_label, sessions, [m["name"] for k, m in mkts.items()
                                                        if not any(p["m"] == k for p in pieces)], len(excluded),
-                                  n_rounds=n_rounds, window=window, viewport_only=sorted(viewport_only)),
+                                  n_rounds=n_rounds, window=window, viewport_only=sorted(viewport_only),
+                                  featured=any(p.get("fb") for p in pieces)),
     )
     (out_dir / "data.json").write_text(json.dumps(dict(context=context, data=data), ensure_ascii=False, indent=1),
                                        encoding="utf-8")

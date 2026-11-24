@@ -96,7 +96,7 @@ Se for mexer no navegador/CDP, leia também os guias do RAC (não copiados aqui)
 
 ```bash
 pip install -r requirements.txt && playwright install chromium
-pytest -q                                   # 80 testes; os e2e pulam sem Chrome
+pytest -q                                   # os e2e pulam sem Chrome
 
 # Uma URL (desktop + mobile), anônimo, via Chrome comum (RAC_LOCAL_CHROME=1)
 python -m shelfproof capture https://www.magazineluiza.com.br/ --device both
@@ -120,11 +120,16 @@ python -m shelfproof event --only "Magalu,Casas Bahia" --devices mobile
 python -m shelfproof contact-sheet runs/showroom/2026-11-17 # revisar; review.json na mesma pasta
 python -m shelfproof event --rebuild                        # refaz o dia sem capturar
 python -m shelfproof event --list                           # capturas do dia; teste/quebrada -> review.json "exclude_runs"
+
+# Varejo especialista em ar-condicionado (11 homes: Frigelar, Dufrio, Leveros...). Pasta propria,
+# para nao somar com o Showroom dos marketplaces no mesmo dia. Sem pago: "Marcas em destaque".
+python -m shelfproof event --targets config/targets_especialistas.json --out runs/especialistas --event "Black Friday - Especialistas"
 ```
 
 Windows (PC coletor): `scripts\instalar.bat` uma vez (venv próprio, não o do RAC — COMMON_MISTAKES S16).
 À mão por enquanto (agendamento a cada hora vem depois):
 `scripts\coleta_dia.bat` (uma rodada; aceita as opções do `event`),
+`scripts\coleta_especialistas.bat` (as 11 homes de especialistas de ar-condicionado; `--rebuild` refaz),
 `scripts\remontar_dia.bat` (depois do `review.json`), `scripts\publicar_dia.bat`.
 Imagens no `review.json`: `<site>_<nn>` no desktop e `<site>_m_<nn>` no celular; a
 numeração segue a ordem em que a peça apareceu, então uma rodada nova não renumera.
